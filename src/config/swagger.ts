@@ -12,7 +12,7 @@ const options: swaggerJsdoc.Options = {
     servers: [
       {
         url: `http://localhost:${config.port}`,
-        description: "Local development server",
+        description: "production server",
       },
     ],
     components: {
@@ -83,4 +83,4 @@ const options: swaggerJsdoc.Options = {
   ],
 };
 
-export const swaggerSpec = swaggerJsdoc(options);
+export const swaggerSpec = swaggerJsdoc(options);
