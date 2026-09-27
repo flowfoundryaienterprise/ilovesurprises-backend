@@ -11,3 +11,13 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'supersecretkeychangeinproduction',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
 };
+
+// Validate critical environment variables in production
+if (config.isProduction) {
+  if (!config.databaseUrl) {
+    console.warn('⚠️  DATABASE_URL environment variable is missing.');
+  }
+  if (!process.env.JWT_SECRET) {
+    console.warn('⚠️  JWT_SECRET environment variable is missing in production.');
+  }
+}
