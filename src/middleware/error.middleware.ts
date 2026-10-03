@@ -13,14 +13,16 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  console.error('Unhandled error:', err);
-
   const statusCode = err.statusCode || err.status || 500;
   const message = err.message || 'Internal Server Error';
+
+  if (statusCode >= 500) {
+    console.error('Unhandled server error:', err);
+  }
 
   res.status(statusCode).json({
     error: err.name || 'Error',
     message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(process.env.NODE_ENV === 'development' && statusCode >= 500 && { stack: err.stack }),
   });
 };

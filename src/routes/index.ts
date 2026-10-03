@@ -1,8 +1,23 @@
 import { Router } from 'express';
 import { healthRouter } from './health.route';
-import { authRouter } from '../modules/auth/auth.routes';
-import { usersRouter } from '../modules/users/users.routes';
-import { adminRouter } from '../modules/admin/admin.routes';
+import { authRouter } from './auth.routes';
+import { usersRouter } from './user.routes';
+import { adminRouter } from './admin.routes';
+import { productsRouter } from './product.routes';
+import { categoriesRouter } from './category.routes';
+import { collectionsRouter } from './collection.routes';
+import { cartRouter } from './cart.routes';
+import { addressesRouter } from './address.routes';
+import { ordersRouter } from './order.routes';
+import { paymentsRouter } from './payment.routes';
+import { affiliateRouter } from './affiliate.routes';
+import { appraisalRouter } from './appraisal.routes';
+import { reviewRouter } from './review.routes';
+import { wishlistRouter } from './wishlist.routes';
+import { couponRouter } from './coupon.routes';
+import { notificationRouter } from './notification.routes';
+import { membershipRouter } from './membership.routes';
+import { cmsRouter } from './cms.routes';
 
 export const apiRouter = Router();
 
@@ -10,3 +25,19 @@ apiRouter.use('/health', healthRouter);
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/users', usersRouter);
 apiRouter.use('/admin', adminRouter);
+apiRouter.use('/products', productsRouter);
+apiRouter.use('/categories', categoriesRouter);
+apiRouter.use('/collections', collectionsRouter);
+apiRouter.use('/cart', cartRouter);
+apiRouter.use('/addresses', addressesRouter);
+apiRouter.use('/orders', ordersRouter);
+apiRouter.use('/payments', paymentsRouter);
+apiRouter.use('/affiliates', affiliateRouter);
+apiRouter.use('/appraisals', appraisalRouter);
+apiRouter.use('/reviews', reviewRouter);
+apiRouter.use('/wishlist', wishlistRouter);
+apiRouter.use('/coupons', couponRouter);
+apiRouter.use('/notifications', notificationRouter);
+apiRouter.use('/memberships', membershipRouter);
+apiRouter.use('/cms', cmsRouter);
+

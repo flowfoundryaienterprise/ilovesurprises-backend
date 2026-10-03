@@ -10,7 +10,13 @@ export const createApp = (): Application => {
   const app = express();
  
   app.use(cors());
-  app.use(express.json());
+  app.use(
+    express.json({
+      verify: (req: any, _res: any, buf: Buffer) => {
+        req.rawBody = buf;
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true }));
  app.use(
   "/api-docs",
