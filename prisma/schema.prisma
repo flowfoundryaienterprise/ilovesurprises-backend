@@ -8,6 +8,711 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model User {
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  passwordHash       String
+  firstName          String?
+  lastName           String?
+  role               UserRole             @default(CUSTOMER)
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  affiliate_profiles affiliate_profiles?
+  appraisal_records  appraisal_records[]
+  carts              carts?
+  coupon_usages      coupon_usages[]
+  customer_addresses customer_addresses[]
+  orders             orders[]
+  product_reviews    product_reviews[]
+  user_memberships   user_memberships?
+  user_notifications user_notifications[]
+  wishlist_items     wishlist_items[]
+
+  @@map("users")
+}
+
+model affiliate_profiles {
+  id                        String                      @id
+  userId                    String                      @unique
+  referralCode              String                      @unique
+  slug                      String?                     @unique
+  sponsorId                 String?
+  status                    String                      @default("ACTIVE")
+  lifetimeEarnings          Decimal                     @default(0) @db.Decimal(10, 2)
+  currentBalance            Decimal                     @default(0) @db.Decimal(10, 2)
+  pendingBalance            Decimal                     @default(0) @db.Decimal(10, 2)
+  payoutMethod              String?
+  payoutDetails             Json?
+  commissionRate            Decimal                     @default(0.20) @db.Decimal(5, 4)
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime
+  affiliate_profiles        affiliate_profiles?         @relation("affiliate_profilesToaffiliate_profiles", fields: [sponsorId], references: [id])
+  other_affiliate_profiles  affiliate_profiles[]        @relation("affiliate_profilesToaffiliate_profiles")
+  users                     User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commission_ledger_entries commission_ledger_entries[]
+  commission_records        commission_records[]
+  genealogy_nodes           genealogy_nodes?
+  payout_requests           payout_requests[]
+  referral_visits           referral_visits[]
+
+  @@index([referralCode])
+  @@index([sponsorId])
+  @@index([status])
+}
+
+model appraisal_records {
+  id                String    @id
+  appraisalCode     String    @unique
+  userId            String?
+  customerName      String
+  customerEmail     String
+  customerPhone     String?
+  jewelryType       String
+  metalType         String?
+  gemstoneType      String?
+  description       String?
+  images            String[]  @default([])
+  estimatedValue    Decimal?  @db.Decimal(10, 2)
+  appraisedValue    Decimal?  @db.Decimal(10, 2)
+  appraiserNotes    String?
+  certificateNumber String?   @unique
+  status            String    @default("SUBMITTED")
+  appraisedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime
+  users             User?     @relation(fields: [userId], references: [id])
+
+  @@index([appraisalCode])
+  @@index([status])
+  @@index([userId])
+}
+
+model cart_items {
+  id               String            @id
+  cartId           String
+  productId        String
+  variantId        String?
+  quantity         Int               @default(1)
+  selectedRingSize String?
+  selectedScent    String?
+  customNote       String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime
+  carts            carts             @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  products         products          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product_variants product_variants? @relation(fields: [variantId], references: [id])
+
+  @@index([cartId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+model carts {
+  id         String       @id
+  userId     String       @unique
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime
+  cart_items cart_items[]
+  users      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model categories {
+  id               String       @id
+  name             String
+  slug             String       @unique
+  description      String?
+  image            String?
+  parentId         String?
+  isActive         Boolean      @default(true)
+  sortOrder        Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime
+  categories       categories?  @relation("categoriesTocategories", fields: [parentId], references: [id])
+  other_categories categories[] @relation("categoriesTocategories")
+  products         products[]
+
+  @@index([isActive])
+  @@index([parentId])
+  @@index([slug])
+}
+
+model cms_banners {
+  id        String   @id
+  title     String
+  subtitle  String?
+  imageUrl  String
+  linkUrl   String?
+  position  String   @default("HERO")
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@index([isActive])
+  @@index([position])
+}
+
+model cms_navigation_items {
+  id                         String                 @id
+  label                      String
+  url                        String
+  parentId                   String?
+  sortOrder                  Int                    @default(0)
+  isActive                   Boolean                @default(true)
+  location                   String                 @default("HEADER")
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime
+  cms_navigation_items       cms_navigation_items?  @relation("cms_navigation_itemsTocms_navigation_items", fields: [parentId], references: [id])
+  other_cms_navigation_items cms_navigation_items[] @relation("cms_navigation_itemsTocms_navigation_items")
+
+  @@index([isActive])
+  @@index([location])
+}
+
+model cms_pages {
+  id              String   @id
+  slug            String   @unique
+  title           String
+  content         String
+  metaTitle       String?
+  metaDescription String?
+  isPublished     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([isPublished])
+  @@index([slug])
+}
+
+model collections {
+  id                  String                @id
+  name                String
+  slug                String                @unique
+  description         String?
+  bannerImage         String?
+  isActive            Boolean               @default(true)
+  sortOrder           Int                   @default(0)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  product_collections product_collections[]
+
+  @@index([isActive])
+  @@index([slug])
+}
+
+model commission_ledger_entries {
+  id                 String             @id
+  affiliateId        String
+  type               String
+  amount             Decimal            @db.Decimal(10, 2)
+  balanceAfter       Decimal            @db.Decimal(10, 2)
+  reason             String
+  referenceId        String?
+  createdAt          DateTime           @default(now())
+  affiliate_profiles affiliate_profiles @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@index([createdAt])
+}
+
+model commission_records {
+  id                 String             @id
+  affiliateId        String
+  orderId            String
+  level              Int
+  rate               Decimal            @db.Decimal(5, 4)
+  orderAmount        Decimal            @db.Decimal(10, 2)
+  commissionAmount   Decimal            @db.Decimal(10, 2)
+  status             String             @default("PENDING")
+  description        String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime
+  affiliate_profiles affiliate_profiles @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  orders             orders             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([affiliateId, orderId, level])
+  @@index([affiliateId])
+  @@index([orderId])
+  @@index([status])
+}
+
+model coupon_usages {
+  id               String           @id
+  couponId         String
+  userId           String
+  orderId          String?
+  discountApplied  Decimal          @db.Decimal(10, 2)
+  createdAt        DateTime         @default(now())
+  discount_coupons discount_coupons @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  orders           orders?          @relation(fields: [orderId], references: [id])
+  users            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@index([orderId])
+  @@index([userId])
+}
+
+model customer_addresses {
+  id           String   @id
+  userId       String
+  firstName    String
+  lastName     String
+  phone        String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  postalCode   String
+  country      String   @default("US")
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  users        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders       orders[]
+
+  @@index([userId])
+}
+
+model daily_sales_snapshots {
+  id             String   @id
+  date           DateTime @unique
+  totalOrders    Int      @default(0)
+  totalSales     Decimal  @default(0) @db.Decimal(12, 2)
+  totalRefunds   Decimal  @default(0) @db.Decimal(12, 2)
+  netSales       Decimal  @default(0) @db.Decimal(12, 2)
+  totalShipping  Decimal  @default(0) @db.Decimal(10, 2)
+  totalTax       Decimal  @default(0) @db.Decimal(10, 2)
+  totalDiscounts Decimal  @default(0) @db.Decimal(10, 2)
+  newCustomers   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+
+  @@index([date])
+}
+
+model discount_coupons {
+  id                String          @id
+  code              String          @unique
+  description       String?
+  discountType      String
+  discountValue     Decimal         @db.Decimal(10, 2)
+  minOrderAmount    Decimal?        @db.Decimal(10, 2)
+  maxDiscountAmount Decimal?        @db.Decimal(10, 2)
+  startDate         DateTime        @default(now())
+  endDate           DateTime?
+  maxUses           Int?
+  currentUses       Int             @default(0)
+  maxUsesPerUser    Int             @default(1)
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime
+  coupon_usages     coupon_usages[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model genealogy_nodes {
+  id                    String             @id
+  affiliateId           String             @unique
+  parentId              String?
+  level                 Int                @default(0)
+  path                  String             @default("")
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime
+  affiliate_profiles    affiliate_profiles @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  genealogy_nodes       genealogy_nodes?   @relation("genealogy_nodesTogenealogy_nodes", fields: [parentId], references: [id])
+  other_genealogy_nodes genealogy_nodes[]  @relation("genealogy_nodesTogenealogy_nodes")
+
+  @@index([level])
+  @@index([parentId])
+}
+
+model inventory_logs {
+  id               String            @id
+  productId        String
+  variantId        String?
+  changeQty        Int
+  previousQty      Int
+  newQty           Int
+  reason           String
+  createdBy        String?
+  createdAt        DateTime          @default(now())
+  products         products          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product_variants product_variants? @relation(fields: [variantId], references: [id])
+
+  @@index([productId])
+  @@index([variantId])
+}
+
+model membership_plans {
+  id               String             @id
+  name             String
+  slug             String             @unique
+  description      String?
+  price            Decimal            @db.Decimal(10, 2)
+  interval         String             @default("MONTHLY")
+  discountPercent  Decimal            @default(10) @db.Decimal(5, 2)
+  freeShipping     Boolean            @default(true)
+  perks            String[]           @default([])
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  user_memberships user_memberships[]
+
+  @@index([isActive])
+  @@index([slug])
+}
+
+model order_fulfillments {
+  id              String            @id
+  orderId         String
+  status          FulfillmentStatus @default(UNFULFILLED)
+  trackingCompany String?
+  trackingNumber  String?
+  trackingUrl     String?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  orders          orders            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model order_items {
+  id               String            @id
+  orderId          String
+  productId        String?
+  variantId        String?
+  productName      String
+  variantTitle     String?
+  sku              String?
+  unitPrice        Decimal           @db.Decimal(10, 2)
+  quantity         Int
+  lineTotal        Decimal           @db.Decimal(10, 2)
+  selectedRingSize String?
+  selectedScent    String?
+  customNote       String?
+  imageUrl         String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime
+  orders           orders            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  products         products?         @relation(fields: [productId], references: [id])
+  product_variants product_variants? @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+model order_notes {
+  id                String   @id
+  orderId           String
+  authorId          String?
+  authorRole        String?
+  note              String
+  isCustomerVisible Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  orders            orders   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model orders {
+  id                      String                 @id
+  orderNumber             String                 @unique
+  userId                  String
+  status                  OrderStatus            @default(PENDING)
+  paymentStatus           PaymentStatus          @default(PENDING)
+  paymentMethod           PaymentMethod
+  currency                String                 @default("USD")
+  subtotal                Decimal                @db.Decimal(10, 2)
+  shippingFee             Decimal                @default(0) @db.Decimal(10, 2)
+  taxAmount               Decimal                @default(0) @db.Decimal(10, 2)
+  discountAmount          Decimal                @default(0) @db.Decimal(10, 2)
+  totalAmount             Decimal                @db.Decimal(10, 2)
+  customerNote            String?
+  shippingAddressId       String?
+  shippingAddressSnapshot Json
+  inventoryDeducted       Boolean                @default(false)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime
+  commission_records      commission_records[]
+  coupon_usages           coupon_usages[]
+  order_fulfillments      order_fulfillments[]
+  order_items             order_items[]
+  order_notes             order_notes[]
+  customer_addresses      customer_addresses?    @relation(fields: [shippingAddressId], references: [id])
+  users                   User                   @relation(fields: [userId], references: [id])
+  payment_transactions    payment_transactions[]
+  refund_records          refund_records[]
+
+  @@index([createdAt])
+  @@index([orderNumber])
+  @@index([paymentStatus])
+  @@index([status])
+  @@index([userId])
+}
+
+model payment_transactions {
+  id                    String        @id
+  orderId               String
+  paymentMethod         PaymentMethod
+  amount                Decimal       @db.Decimal(10, 2)
+  currency              String        @default("USD")
+  status                PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?       @unique
+  stripeChargeId        String?
+  stripeClientSecret    String?
+  gatewayResponse       Json?
+  errorMessage          String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime
+  orders                orders        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([stripePaymentIntentId])
+}
+
+model payout_requests {
+  id                 String             @id
+  affiliateId        String
+  amount             Decimal            @db.Decimal(10, 2)
+  currency           String             @default("USD")
+  status             String             @default("PENDING")
+  payoutMethod       String
+  accountDetails     Json?
+  referenceId        String?
+  processedAt        DateTime?
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime
+  affiliate_profiles affiliate_profiles @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@index([status])
+}
+
+model product_collections {
+  productId    String
+  collectionId String
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  collections  collections @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  products     products    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, collectionId])
+  @@index([collectionId])
+  @@index([productId])
+}
+
+model product_images {
+  id        String   @id
+  productId String
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  products  products @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model product_option_values {
+  id              String          @id
+  optionId        String
+  value           String
+  sortOrder       Int             @default(0)
+  createdAt       DateTime        @default(now())
+  product_options product_options @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@index([optionId])
+}
+
+model product_options {
+  id                    String                  @id
+  productId             String
+  name                  String
+  createdAt             DateTime                @default(now())
+  product_option_values product_option_values[]
+  products              products                @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model product_reviews {
+  id                 String   @id
+  productId          String
+  userId             String
+  rating             Int
+  title              String?
+  comment            String
+  isVerifiedPurchase Boolean  @default(false)
+  isApproved         Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+  products           products @relation(fields: [productId], references: [id], onDelete: Cascade)
+  users              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([rating])
+  @@index([userId])
+}
+
+model product_variants {
+  id             String           @id
+  productId      String
+  title          String?
+  sku            String?          @unique
+  price          Decimal          @db.Decimal(10, 2)
+  compareAtPrice Decimal?         @db.Decimal(10, 2)
+  stock          Int              @default(0)
+  ringSize       String?
+  scent          String?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  cart_items     cart_items[]
+  inventory_logs inventory_logs[]
+  order_items    order_items[]
+  products       products         @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([sku])
+}
+
+model products {
+  id                  String                @id
+  name                String
+  slug                String                @unique
+  shortDescription    String?
+  description         String?
+  price               Decimal               @db.Decimal(10, 2)
+  compareAtPrice      Decimal?              @db.Decimal(10, 2)
+  imageUrl            String?
+  categoryId          String?
+  surpriseType        String?
+  surpriseValue       Decimal?              @db.Decimal(10, 2)
+  rating              Float                 @default(0)
+  reviewCount         Int                   @default(0)
+  stock               Int                   @default(0)
+  lowStockThreshold   Int                   @default(5)
+  sku                 String?               @unique
+  badge               String?
+  isBestSeller        Boolean               @default(false)
+  isNew               Boolean               @default(false)
+  scentNotes          String[]              @default([])
+  ringSizes           String[]              @default([])
+  jewelryTypes        String[]              @default([])
+  status              ProductStatus         @default(DRAFT)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  cart_items          cart_items[]
+  inventory_logs      inventory_logs[]
+  order_items         order_items[]
+  product_collections product_collections[]
+  product_images      product_images[]
+  product_options     product_options[]
+  product_reviews     product_reviews[]
+  product_variants    product_variants[]
+  categories          categories?           @relation(fields: [categoryId], references: [id])
+  wishlist_items      wishlist_items[]
+
+  @@index([categoryId])
+  @@index([isBestSeller])
+  @@index([isNew])
+  @@index([price])
+  @@index([sku])
+  @@index([slug])
+  @@index([status])
+}
+
+model referral_visits {
+  id                 String             @id
+  affiliateId        String
+  ipAddress          String?
+  userAgent          String?
+  landingPage        String?
+  referrerUrl        String?
+  converted          Boolean            @default(false)
+  orderId            String?
+  createdAt          DateTime           @default(now())
+  affiliate_profiles affiliate_profiles @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@index([createdAt])
+}
+
+model refund_records {
+  id                   String   @id
+  orderId              String
+  paymentTransactionId String?
+  amount               Decimal  @db.Decimal(10, 2)
+  currency             String   @default("USD")
+  reason               String?
+  stripeRefundId       String?  @unique
+  status               String   @default("COMPLETED")
+  processedBy          String?
+  createdAt            DateTime @default(now())
+  orders               orders   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model user_memberships {
+  id               String           @id
+  userId           String           @unique
+  planId           String
+  status           String           @default("ACTIVE")
+  startDate        DateTime         @default(now())
+  endDate          DateTime?
+  autoRenew        Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  membership_plans membership_plans @relation(fields: [planId], references: [id], onDelete: Cascade)
+  users            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+}
+
+model user_notifications {
+  id        String   @id
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  actionUrl String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([isRead])
+  @@index([userId])
+}
+
+model wishlist_items {
+  id        String   @id
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  products  products @relation(fields: [productId], references: [id], onDelete: Cascade)
+  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@index([userId])
+}
+
 enum UserRole {
   CUSTOMER
   AFFILIATE
@@ -15,17 +720,39 @@ enum UserRole {
   ADMIN
 }
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  firstName    String?
-  lastName     String?
-  role         UserRole @default(CUSTOMER)
-  isActive     Boolean  @default(true)
+enum FulfillmentStatus {
+  UNFULFILLED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
 
-  @@map("users")
+enum PaymentMethod {
+  STRIPE
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
 }
