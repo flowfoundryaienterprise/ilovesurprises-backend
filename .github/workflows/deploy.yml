@@ -52,36 +52,27 @@ jobs:
             echo "=== Local health check on VPS ==="
             curl -s http://localhost:3000/health || true
 
-            echo "=== Recording VPS Diagnostic Information ==="
-            {
-              echo "=== NGINX CONFIG ==="
-              cat /etc/nginx/sites-enabled/* 2>&1 || true
-              echo "=== /VAR/WWW LISTING ==="
-              ls -la /var/www 2>&1 || true
-              for d in /var/www/*; do
-                if [ -d "$d/.git" ]; then
-                  echo "=== REPO: $d ==="
-                  cd "$d"
-                  git remote -v 2>&1 || true
-                  git status 2>&1 || true
-                fi
-              done
-            } > /var/www/html/vps-info.txt 2>/dev/null || true
+            echo "=== Deploying Active Frontend (efe9e26) ==="
+            cd /var/www
+            if [ ! -d "/var/www/Ilovesurprises-frontend/.git" ]; then
+              echo "Cloning Ilovesurprises-frontend..."
+              git clone https://github.com/flowfoundryaienterprise/Ilovesurprises-frontend.git /var/www/Ilovesurprises-frontend || true
+            fi
 
-            echo "=== Updating Active Frontend on VPS ==="
-            for FE_DIR in /var/www/Ilovesurprises-frontend /var/www/Ilovesuprises-frontend /var/www/ilovesurprises-frontend /var/www/ilovesurprises-platform; do
-              if [ -d "$FE_DIR/.git" ]; then
-                echo "Deploying frontend at $FE_DIR"
-                cd "$FE_DIR"
-                git fetch origin || true
-                (git checkout main && git reset --hard origin/main) || (git checkout Feat/Frontend && git reset --hard origin/Feat/Frontend) || true
-                echo "Frontend at: $(git log -1 --oneline)"
-                npm ci || npm install
-                npm run build
-                if [ -d "/var/www/html" ]; then
-                  echo "Syncing built dist to /var/www/html..."
-                  cp -ru dist/* /var/www/html/ 2>/dev/null || true
-                fi
+            cd /var/www/Ilovesurprises-frontend
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
+            echo "Frontend commit: $(git log -1 --oneline)"
+            npm ci || npm install
+            npm run build
+
+            echo "=== Syncing built dist to web roots ==="
+            for TARGET in /var/www/html /var/www/ilovesurprises-platform/dist /var/www/ilovesurprises-frontend/dist /var/www/frontend/dist; do
+              if [ -d "$TARGET" ]; then
+                echo "Syncing dist to $TARGET"
+                rm -rf "$TARGET"/* || true
+                cp -r dist/* "$TARGET"/ || true
               fi
             done
 
