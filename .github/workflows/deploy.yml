@@ -53,26 +53,22 @@ jobs:
             curl -s http://localhost:3000/health || true
 
             echo "=== Deploying Active Frontend (efe9e26) ==="
-            cd /var/www
-            if [ ! -d "/var/www/Ilovesurprises-frontend/.git" ]; then
-              echo "Cloning Ilovesurprises-frontend..."
-              git clone https://github.com/flowfoundryaienterprise/Ilovesurprises-frontend.git /var/www/Ilovesurprises-frontend || true
-            fi
-
-            cd /var/www/Ilovesurprises-frontend
-            git fetch origin
-            git checkout main
-            git reset --hard origin/main
-            echo "Frontend commit: $(git log -1 --oneline)"
-            npm ci || npm install
-            npm run build
-
-            echo "=== Syncing built dist to web roots ==="
-            for TARGET in /var/www/html /var/www/ilovesurprises-platform/dist /var/www/ilovesurprises-frontend/dist /var/www/frontend/dist; do
-              if [ -d "$TARGET" ]; then
-                echo "Syncing dist to $TARGET"
-                rm -rf "$TARGET"/* || true
-                cp -r dist/* "$TARGET"/ || true
+            for FE_DIR in /var/www/ilovesurprises-platform /var/www/Ilovesurprises-frontend /var/www/ilovesurprises-frontend; do
+              if [ -d "$FE_DIR" ]; then
+                echo "Configuring $FE_DIR to point to Ilovesurprises-frontend..."
+                cd "$FE_DIR"
+                git remote set-url origin https://github.com/flowfoundryaienterprise/Ilovesurprises-frontend.git || true
+                git fetch origin
+                git checkout -B main origin/main
+                git reset --hard origin/main
+                echo "Frontend at: $(git log -1 --oneline)"
+                npm ci || npm install
+                npm run build
+                echo "Build completed in $FE_DIR"
+                if [ -d "/var/www/html" ] && [ "$FE_DIR" != "/var/www/html" ]; then
+                  echo "Copying dist to /var/www/html..."
+                  cp -r dist/* /var/www/html/ 2>/dev/null || true
+                fi
               fi
             done
 
