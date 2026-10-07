@@ -21,19 +21,62 @@ jobs:
             git config --global --add safe.directory "*" || true
             echo "=== Listing /var/www ==="
             ls -la /var/www
+
             echo "=== Deploying Backend commit 5e41958 ==="
             cd /var/www/ilovesurprises-backend
             git fetch origin
             git checkout Feat/Backend || git checkout -b Feat/Backend origin/Feat/Backend
             git reset --hard 5e41958
-            git show origin/main:ecosystem.config.js > ecosystem.config.js
-            echo "Backend checked out at: $(git log -1 --oneline)"
+
+            # Write production .env file
+            cat << 'EOF' > .env
+PORT=3000
+NODE_ENV=production
+DATABASE_URL="postgresql://postgres.hwwxtxpkukgxnwchhnvo:ILoveSurprisesDB2026Secure@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.hwwxtxpkukgxnwchhnvo:ILoveSurprisesDB2026Secure@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+JWT_SECRET="ilovesurprises-prod-super-secure-jwt-secret-key-2026-auth"
+JWT_EXPIRES_IN="7d"
+EOF
+
+            # Write ecosystem.config.js for PM2
+            cat << 'EOF' > ecosystem.config.js
+module.exports = {
+  apps: [
+    {
+      name: "ilovesurprises-api",
+      script: "dist/index.js",
+      instances: 1,
+      exec_mode: "fork",
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "500M",
+      env: {
+        NODE_ENV: "production",
+        PORT: 3000
+      }
+    }
+  ]
+};
+EOF
+
+            echo "Backend verified commit: $(git log -1 --oneline)"
             npm ci
             npx prisma generate
             npm run build
-            pm2 reload ecosystem.config.js --update-env || pm2 restart ilovesurprises-api || pm2 start ecosystem.config.js
+
+            echo "Restarting PM2 backend service..."
+            pm2 delete all || true
+            pm2 start ecosystem.config.js
+            pm2 save || true
+            sleep 3
             pm2 status
-            echo "=== Deploying Frontend ==="
+            echo "=== PM2 recent logs ==="
+            pm2 logs ilovesurprises-api --lines 30 --nostream || true
+
+            echo "=== Local health check on VPS ==="
+            curl -s http://localhost:3000/health || true
+
+            echo "=== Updating Frontend on VPS ==="
             for DIR in /var/www/*; do
               if [ -d "$DIR/.git" ] && [ "$DIR" != "/var/www/ilovesurprises-backend" ]; then
                 echo "Updating frontend repository at $DIR"
@@ -44,10 +87,11 @@ jobs:
                 npm ci
                 npm run build
                 if [ -d "/var/www/html" ] && [ "$DIR" != "/var/www/html" ]; then
-                  echo "Copying dist to /var/www/html..."
+                  echo "Syncing built dist to /var/www/html..."
                   cp -ru dist/* /var/www/html/ 2>/dev/null || true
                 fi
               fi
             done
+
             sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || true
             echo "Deployment finished successfully!"
