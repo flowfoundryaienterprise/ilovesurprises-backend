@@ -52,19 +52,42 @@ jobs:
             echo "=== Local health check on VPS ==="
             curl -s http://localhost:3000/health || true
 
-            echo "=== Updating Frontend on VPS ==="
-            for DIR in /var/www/*; do
-              if [ -d "$DIR/.git" ] && [ "$DIR" != "/var/www/ilovesurprises-backend" ]; then
-                echo "Updating frontend repository at $DIR"
-                cd "$DIR"
+            echo "=== Recording VPS Diagnostic Information ==="
+            cd /var/www/ilovesurprises-backend
+            echo "=== NGINX CONFIG ===" > vps-info.txt
+            cat /etc/nginx/sites-enabled/* >> vps-info.txt 2>&1 || true
+            echo "=== /VAR/WWW LISTING ===" >> vps-info.txt
+            ls -la /var/www >> vps-info.txt
+            for d in /var/www/*; do
+              if [ -d "$d/.git" ]; then
+                echo "=== REPO: $d ===" >> vps-info.txt
+                cd "$d"
+                git remote -v >> /var/www/ilovesurprises-backend/vps-info.txt
+                git log -1 --oneline >> /var/www/ilovesurprises-backend/vps-info.txt
+              fi
+            done
+            cd /var/www/ilovesurprises-backend
+            git checkout -B vps-diagnostics
+            git add vps-info.txt
+            git commit -m "chore: vps diagnostic info" || true
+            git push origin vps-diagnostics -f || true
+            git checkout Feat/Backend || true
+
+            echo "=== Updating Active Frontend on VPS ==="
+            for FE_DIR in /var/www/Ilovesurprises-frontend /var/www/Ilovesuprises-frontend /var/www/ilovesurprises-frontend; do
+              if [ -d "$FE_DIR/.git" ]; then
+                echo "Deploying real frontend at $FE_DIR"
+                cd "$FE_DIR"
                 git fetch origin
-                (git checkout main && git reset --hard origin/main) || true
+                git checkout main || git checkout -b main origin/main
+                git reset --hard origin/main
                 echo "Frontend at: $(git log -1 --oneline)"
                 npm ci
                 npm run build
-                if [ -d "/var/www/html" ] && [ "$DIR" != "/var/www/html" ]; then
+                if [ -d "/var/www/html" ]; then
                   echo "Syncing built dist to /var/www/html..."
-                  cp -ru dist/* /var/www/html/ 2>/dev/null || true
+                  rm -rf /var/www/html/* || true
+                  cp -r dist/* /var/www/html/ || true
                 fi
               fi
             done
