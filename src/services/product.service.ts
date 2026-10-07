@@ -96,103 +96,145 @@ export class ProductsService {
     const limit = Math.max(1, Math.min(100, query.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = {};
+    const andConditions: Prisma.ProductWhereInput[] = [];
 
     // For public requests, only ACTIVE products are visible
     if (isPublic) {
-      where.status = ProductStatus.ACTIVE;
+      andConditions.push({ status: ProductStatus.ACTIVE });
     } else if (query.status) {
-      where.status = query.status;
+      andConditions.push({ status: query.status });
     }
 
     if (query.search) {
       const q = query.search.trim();
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-        { shortDescription: { contains: q, mode: 'insensitive' } },
-        { sku: { contains: q, mode: 'insensitive' } },
-        { surpriseType: { contains: q, mode: 'insensitive' } },
-      ];
-    }
-
-    if (query.category) {
-      where.category = {
+      andConditions.push({
         OR: [
-          { id: query.category },
-          { slug: query.category },
+          { name: { contains: q, mode: 'insensitive' } },
+          { description: { contains: q, mode: 'insensitive' } },
+          { shortDescription: { contains: q, mode: 'insensitive' } },
+          { sku: { contains: q, mode: 'insensitive' } },
+          { surpriseType: { contains: q, mode: 'insensitive' } },
         ],
-      };
+      });
     }
 
-    if (query.collection) {
-      where.collections = {
-        some: {
-          collection: {
-            OR: [
-              { id: query.collection },
-              { slug: query.collection },
-            ],
+    // Category or Collection filtering
+    // In imported catalog, hierarchy uses collections (products.categoryId is NULL)
+    const targetCollection = query.collection || query.category;
+    if (targetCollection && targetCollection !== 'all' && targetCollection !== 'All Surprises') {
+      const term = targetCollection.trim();
+      andConditions.push({
+        OR: [
+          {
+            collections: {
+              some: {
+                collection: {
+                  OR: [
+                    { id: term },
+                    { slug: { equals: term, mode: 'insensitive' } },
+                    { slug: { startsWith: term, mode: 'insensitive' } },
+                    { name: { contains: term, mode: 'insensitive' } },
+                  ],
+                },
+              },
+            },
           },
-        },
-      };
+          {
+            category: {
+              OR: [
+                { id: term },
+                { slug: { equals: term, mode: 'insensitive' } },
+                { slug: { startsWith: term, mode: 'insensitive' } },
+                { name: { contains: term, mode: 'insensitive' } },
+              ],
+            },
+          },
+        ],
+      });
     }
 
     if (query.surpriseType) {
-      where.surpriseType = { equals: query.surpriseType, mode: 'insensitive' };
+      const st = query.surpriseType.toLowerCase().trim();
+      if (st === 'jewelry' || st === 'jewellery') {
+        andConditions.push({
+          OR: [
+            { surpriseType: { contains: 'ring', mode: 'insensitive' } },
+            { surpriseType: { contains: 'jewel', mode: 'insensitive' } },
+            { surpriseType: { contains: 'pendant', mode: 'insensitive' } },
+            { surpriseType: { contains: 'necklace', mode: 'insensitive' } },
+            { surpriseType: { contains: 'bracelet', mode: 'insensitive' } },
+            { surpriseType: { contains: 'earring', mode: 'insensitive' } },
+            { surpriseType: { contains: 'diamond', mode: 'insensitive' } },
+          ],
+        });
+      } else if (st === 'cash' || st === 'money') {
+        andConditions.push({
+          OR: [
+            { surpriseType: { contains: 'cash', mode: 'insensitive' } },
+            { surpriseType: { contains: 'money', mode: 'insensitive' } },
+          ],
+        });
+      } else {
+        andConditions.push({
+          surpriseType: { contains: query.surpriseType, mode: 'insensitive' },
+        });
+      }
     }
 
     if (query.minPrice !== undefined || query.maxPrice !== undefined) {
-      where.price = {};
-      if (query.minPrice !== undefined) where.price.gte = query.minPrice;
-      if (query.maxPrice !== undefined) where.price.lte = query.maxPrice;
+      const priceFilter: Prisma.FloatFilter = {};
+      if (query.minPrice !== undefined) priceFilter.gte = query.minPrice;
+      if (query.maxPrice !== undefined) priceFilter.lte = query.maxPrice;
+      andConditions.push({ price: priceFilter });
     }
 
     if (query.rating !== undefined) {
-      where.rating = { gte: query.rating };
+      andConditions.push({ rating: { gte: query.rating } });
     }
 
     if (query.inStock !== undefined) {
       if (query.inStock) {
-        where.stock = { gt: 0 };
+        andConditions.push({ stock: { gt: 0 } });
       } else {
-        where.stock = { equals: 0 };
+        andConditions.push({ stock: { equals: 0 } });
       }
     }
 
     if (query.isBestSeller !== undefined) {
-      where.isBestSeller = query.isBestSeller;
+      andConditions.push({ isBestSeller: query.isBestSeller });
     }
 
     if (query.isNew !== undefined) {
-      where.isNew = query.isNew;
+      andConditions.push({ isNew: query.isNew });
     }
 
-    // Determine order by
-    let orderBy: Prisma.ProductOrderByWithRelationInput[] = [{ createdAt: 'desc' }];
+    const where: Prisma.ProductWhereInput = andConditions.length > 0 ? { AND: andConditions } : {};
+
+    // Determine order by with deterministic tie-breaker
+    let orderBy: Prisma.ProductOrderByWithRelationInput[] = [{ isBestSeller: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }];
 
     switch (query.sort) {
       case 'best_sellers':
       case 'bestselling':
-        orderBy = [{ isBestSeller: 'desc' }, { reviewCount: 'desc' }, { rating: 'desc' }];
+        orderBy = [{ isBestSeller: 'desc' }, { reviewCount: 'desc' }, { rating: 'desc' }, { id: 'asc' }];
         break;
       case 'price_asc':
       case 'price-low-to-high':
-        orderBy = [{ price: 'asc' }];
+        orderBy = [{ price: 'asc' }, { id: 'asc' }];
         break;
       case 'price_desc':
       case 'price-high-to-low':
-        orderBy = [{ price: 'desc' }];
+        orderBy = [{ price: 'desc' }, { id: 'asc' }];
         break;
       case 'rating':
-        orderBy = [{ rating: 'desc' }, { reviewCount: 'desc' }];
+        orderBy = [{ rating: 'desc' }, { reviewCount: 'desc' }, { id: 'asc' }];
         break;
       case 'newest':
-        orderBy = [{ createdAt: 'desc' }];
+        orderBy = [{ createdAt: 'desc' }, { id: 'asc' }];
         break;
       case 'featured':
       default:
-        orderBy = [{ isBestSeller: 'desc' }, { createdAt: 'desc' }];
+        orderBy = [{ isBestSeller: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }];
         break;
     }
 
