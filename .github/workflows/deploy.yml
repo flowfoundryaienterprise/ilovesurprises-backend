@@ -18,82 +18,36 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-
-            echo "=== Safe directory configuration ==="
             git config --global --add safe.directory "*" || true
-
-            echo "=== Current server state ==="
-            whoami
+            echo "=== Listing /var/www ==="
             ls -la /var/www
-
-            echo "=== Checking Nginx configuration ==="
-            cat /etc/nginx/sites-enabled/* 2>/dev/null || true
-
             echo "=== Deploying Backend commit 5e41958 ==="
             cd /var/www/ilovesurprises-backend
             git fetch origin
             git checkout Feat/Backend || git checkout -b Feat/Backend origin/Feat/Backend
             git reset --hard 5e41958
-            echo "Backend verified commit: $(git log -1 --oneline)"
-
-            # Ensure ecosystem.config.js exists for PM2
-            if [ ! -f ecosystem.config.js ]; then
-              cat << 'EOF' > ecosystem.config.js
-module.exports = {
-  apps: [
-    {
-      name: "ilovesurprises-api",
-      script: "dist/index.js",
-      instances: 1,
-      exec_mode: "fork",
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "500M",
-      env: {
-        NODE_ENV: "production"
-      }
-    }
-  ]
-};
-EOF
-            fi
-
-            echo "Installing backend dependencies..."
+            git show origin/main:ecosystem.config.js > ecosystem.config.js
+            echo "Backend checked out at: $(git log -1 --oneline)"
             npm ci
-
-            echo "Generating Prisma client..."
             npx prisma generate
-
-            echo "Building backend application..."
             npm run build
-
-            echo "Reloading PM2 for backend..."
             pm2 reload ecosystem.config.js --update-env || pm2 restart ilovesurprises-api || pm2 start ecosystem.config.js
             pm2 status
-
-            echo "=== Finding and Deploying Frontend ==="
+            echo "=== Deploying Frontend ==="
             for DIR in /var/www/*; do
               if [ -d "$DIR/.git" ] && [ "$DIR" != "/var/www/ilovesurprises-backend" ]; then
-                echo "Found potential frontend repository at $DIR"
+                echo "Updating frontend repository at $DIR"
                 cd "$DIR"
-                echo "Remote: $(git remote -v | head -n 1)"
-                echo "Current commit: $(git log -1 --oneline)"
                 git fetch origin
-                (git checkout main && git reset --hard origin/main) || (git checkout Feat/Frontend && git reset --hard origin/Feat/Frontend) || true
-                echo "Updated commit: $(git log -1 --oneline)"
+                (git checkout main && git reset --hard origin/main) || true
+                echo "Frontend at: $(git log -1 --oneline)"
                 npm ci
                 npm run build
-                echo "Frontend build completed in $DIR"
-
                 if [ -d "/var/www/html" ] && [ "$DIR" != "/var/www/html" ]; then
-                  echo "Syncing build artifacts to /var/www/html..."
+                  echo "Copying dist to /var/www/html..."
                   cp -ru dist/* /var/www/html/ 2>/dev/null || true
                 fi
               fi
             done
-
-            echo "=== Reloading Nginx if applicable ==="
             sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || true
-
-            echo "=== Deployment complete! ==="
-            pm2 status
+            echo "Deployment finished successfully!"
