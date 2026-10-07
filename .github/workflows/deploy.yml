@@ -30,6 +30,9 @@ jobs:
 
             git show 51230de:.env > .env
             sed -i 's/NODE_ENV=development/NODE_ENV=production/' .env
+            echo "STRIPE_SECRET_KEY=sk_test_ilovesurprises_placeholder_secret_key" >> .env
+            echo "STRIPE_WEBHOOK_SECRET=whsec_placeholder_secret_key" >> .env
+            echo "FRONTEND_URL=https://ilovesurprises.com" >> .env
             git show 30ba198:ecosystem.config.js > ecosystem.config.js
 
             echo "Backend verified commit: $(git log -1 --oneline)"
