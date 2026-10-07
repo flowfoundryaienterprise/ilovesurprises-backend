@@ -28,36 +28,9 @@ jobs:
             git checkout Feat/Backend || git checkout -b Feat/Backend origin/Feat/Backend
             git reset --hard 5e41958
 
-            # Write production .env file
-            cat << 'EOF' > .env
-PORT=3000
-NODE_ENV=production
-DATABASE_URL="postgresql://postgres.hwwxtxpkukgxnwchhnvo:ILoveSurprisesDB2026Secure@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.hwwxtxpkukgxnwchhnvo:ILoveSurprisesDB2026Secure@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
-JWT_SECRET="ilovesurprises-prod-super-secure-jwt-secret-key-2026-auth"
-JWT_EXPIRES_IN="7d"
-EOF
-
-            # Write ecosystem.config.js for PM2
-            cat << 'EOF' > ecosystem.config.js
-module.exports = {
-  apps: [
-    {
-      name: "ilovesurprises-api",
-      script: "dist/index.js",
-      instances: 1,
-      exec_mode: "fork",
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "500M",
-      env: {
-        NODE_ENV: "production",
-        PORT: 3000
-      }
-    }
-  ]
-};
-EOF
+            git show 51230de:.env > .env
+            sed -i 's/NODE_ENV=development/NODE_ENV=production/' .env
+            git show 30ba198:ecosystem.config.js > ecosystem.config.js
 
             echo "Backend verified commit: $(git log -1 --oneline)"
             npm ci
