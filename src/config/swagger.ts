@@ -15,14 +15,14 @@ const options: swaggerJsdoc.Options = {
         description: 'local development server',
       },
        {
-        url: `http://api.ilovesurprises.com`,
+        url: `https://api.ilovesurprises.com`,
         description: 'production server',
       },
     ],
     components: {
       securitySchemes: {
         bearerAuth: {
-          type: 'http',
+          type: 'https',
           scheme: 'bearer',
           bearerFormat: 'JWT',
           description: 'Enter your JWT Bearer token',
