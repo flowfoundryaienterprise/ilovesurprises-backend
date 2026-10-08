@@ -16,6 +16,12 @@ import {
   createProductSchema,
   updateProductSchema,
 } from '../validation/product.validation';
+import {
+  analyticsReportSchema,
+  adminCommissionLedgerSchema,
+  exportCsvSchema,
+} from '../validation/analytics.validation';
+import { analyticsController } from '../controllers/analytics.controller';
 import { UserRole } from '@prisma/client';
 
 export const adminRouter = Router();
@@ -338,3 +344,130 @@ adminRouter.patch('/products/:id', validateRequest(updateProductSchema), (req, r
 adminRouter.delete('/products/:id', (req, res, next) => {
   adminController.deleteProduct(req, res, next);
 });
+
+// --- Analytics, Financials & Reports Endpoints (Screenshot 1) ---
+
+/**
+ * @openapi
+ * /api/admin/reports/analytics:
+ *   get:
+ *     summary: Get omnichannel analytics, shopper vs checkout conversion funnels, revenue trajectory, and commission liabilities
+ *     description: Provides complete analytics dataset matching Admin > Reports dashboard with KPIs (Gross Sales, Traffic & Conversion, Membership MRR, Commission Liability), day-by-day revenue trajectory, shopper sessions vs checkouts, and commission tier distribution.
+ *     tags:
+ *       - Admin Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: timeframe
+ *         schema:
+ *           type: string
+ *           enum: [7D, 30D, 90D, YTD]
+ *           default: 7D
+ *         description: Reporting timeframe filter
+ *     responses:
+ *       200:
+ *         description: Full analytics report metrics.
+ */
+adminRouter.get(
+  '/reports/analytics',
+  validateRequest(analyticsReportSchema),
+  analyticsController.getAnalyticsReport
+);
+
+adminRouter.get(
+  '/analytics',
+  validateRequest(analyticsReportSchema),
+  analyticsController.getAnalyticsReport
+);
+
+/**
+ * @openapi
+ * /api/admin/reports/export:
+ *   get:
+ *     summary: Export reports or ledger data as CSV
+ *     tags:
+ *       - Admin Analytics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [sales, ledger, affiliates]
+ *           default: sales
+ *     responses:
+ *       200:
+ *         description: CSV file download.
+ */
+adminRouter.get(
+  '/reports/export',
+  validateRequest(exportCsvSchema),
+  analyticsController.exportReportsCsv
+);
+
+// --- Commission Central & Ledger Endpoints (Screenshot 2) ---
+
+/**
+ * @openapi
+ * /api/admin/commission/central:
+ *   get:
+ *     summary: Get Commission Central overview, approved multi-tier schedule, and policy rules
+ *     description: Returns the 6-tier schedule (20% direct, 5% L1, 4% L2, 3% L3, 2% L4, 1% L5), qualification policy ($125 threshold), and overall liabilities summary.
+ *     tags:
+ *       - Admin Commission Central
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Commission Central overview.
+ */
+adminRouter.get('/commission/central', analyticsController.getCommissionCentralOverview);
+
+/**
+ * @openapi
+ * /api/admin/commission/ledger:
+ *   get:
+ *     summary: Get unilevel commission audit ledger table with multi-criteria filtering
+ *     description: Search by rep, order #ILS, or customer; filter by ledger status and tier level (Direct & L1-L5).
+ *     tags:
+ *       - Admin Commission Central
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search rep name/handle, order number, or customer email
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [all, pending, available, paid, reversed, void, hold]
+ *       - in: query
+ *         name: tier
+ *         schema:
+ *           type: integer
+ *           enum: [0, 1, 2, 3, 4, 5]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Filtered commission ledger records.
+ */
+adminRouter.get(
+  '/commission/ledger',
+  validateRequest(adminCommissionLedgerSchema),
+  analyticsController.getAdminCommissionLedger
+);
+

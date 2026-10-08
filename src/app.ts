@@ -1,5 +1,6 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { apiRouter } from './routes';
 import { healthRouter } from './routes/health.route';
 import swaggerUi from 'swagger-ui-express';
@@ -15,6 +16,7 @@ export const createApp = (): Application => {
   }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
 
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
@@ -33,6 +35,8 @@ export const createApp = (): Application => {
           products: '/api/products',
           cart: '/api/cart',
           storefront: '/api/storefront',
+          affiliates: '/api/affiliates',
+          commission: '/api/commission',
         },
       },
     });

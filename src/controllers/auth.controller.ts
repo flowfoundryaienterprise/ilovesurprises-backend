@@ -27,6 +27,20 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
   }
 };
 
+export const googleLogin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const result = await authService.googleLogin(req.body);
+    res.status(200).json({
+      status: 'success',
+      message: 'Google authentication successful',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 export const getMe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user!.id;
@@ -80,6 +94,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 export const authController = {
   register,
   login,
+  googleLogin,
   getMe,
   logout,
   forgotPassword,

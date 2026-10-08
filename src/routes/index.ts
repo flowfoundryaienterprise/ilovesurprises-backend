@@ -6,6 +6,8 @@ import { adminRouter } from './admin.routes';
 import { productRouter } from './product.routes';
 import { cartRouter } from './cart.routes';
 import { storefrontRouter } from './storefront.routes';
+import { affiliateRouter } from './affiliate.routes';
+import { commissionRouter } from './commission.routes';
 
 export const apiRouter = Router();
 
@@ -16,6 +18,8 @@ apiRouter.use('/admin', adminRouter);
 apiRouter.use('/products', productRouter);
 apiRouter.use('/cart', cartRouter);
 apiRouter.use('/storefront', storefrontRouter);
+apiRouter.use('/affiliates', affiliateRouter);
+apiRouter.use('/commission', commissionRouter);
 
 export {
   healthRouter,
@@ -25,4 +29,7 @@ export {
   productRouter,
   cartRouter,
   storefrontRouter,
+  affiliateRouter,
+  commissionRouter,
 };
+

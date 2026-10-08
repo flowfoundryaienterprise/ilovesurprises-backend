@@ -21,6 +21,16 @@ export interface ResetPasswordDTO {
   newPassword: string;
 }
 
+export interface GoogleLoginDTO {
+  idToken?: string;
+  credential?: string;
+  accessToken?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+
 export interface UserResponseDTO {
   id: string;
   email: string;

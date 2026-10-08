@@ -10,4 +10,6 @@ export const config = {
   isProduction: process.env.NODE_ENV === 'production',
   jwtSecret: process.env.JWT_SECRET || 'supersecretkeychangeinproduction',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
 };
+

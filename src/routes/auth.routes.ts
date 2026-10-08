@@ -5,6 +5,7 @@ import { validateRequest } from '../middlewares/validate.middleware';
 import {
   registerSchema,
   loginSchema,
+  googleLoginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
 } from '../validation/auth.validation';
@@ -91,6 +92,50 @@ authRouter.post('/register', validateRequest(registerSchema), (req, res, next) =
 authRouter.post('/login', validateRequest(loginSchema), (req, res, next) => {
   authController.login(req, res, next);
 });
+
+/**
+ * @openapi
+ * /api/auth/google:
+ *   post:
+ *     summary: Authenticate or register with Google OAuth
+ *     description: Verifies Google credential/idToken or accessToken, extracts user's first name and last name, creates or links account, and returns authenticated user with JWT.
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 description: Google ID token or credential JWT
+ *               credential:
+ *                 type: string
+ *                 description: Alternative field for Google One Tap credential JWT
+ *               accessToken:
+ *                 type: string
+ *                 description: Google OAuth2 access token
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successfully authenticated with Google.
+ *       400:
+ *         description: Validation failed or invalid Google token.
+ *       401:
+ *         description: Inactive user account.
+ */
+authRouter.post('/google', validateRequest(googleLoginSchema), (req, res, next) => {
+  authController.googleLogin(req, res, next);
+});
+
 
 /**
  * @openapi

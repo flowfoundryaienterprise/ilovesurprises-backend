@@ -292,7 +292,14 @@ export const formatDbProduct = (product: any): ProductResponseDTO => {
     });
   }
 
-  const scentNotes = Array.isArray(product.scentNotes) ? product.scentNotes : [];
+  const scentNotes =
+    Array.isArray(product.scentNotes) && product.scentNotes.length > 0
+      ? product.scentNotes
+      : [
+          '1. Pumpkin Spice 🎃 (Holiday Priority Scent)',
+          '2. Spooky Spiced Apple Cider 🍎',
+          '3. Midnight Marshmallow Cauldron 👻',
+        ];
   const ringSizes =
     Array.isArray(product.ringSizes) && product.ringSizes.length > 0
       ? product.ringSizes
@@ -311,7 +318,8 @@ export const formatDbProduct = (product: any): ProductResponseDTO => {
   }));
 
   const maxVal = product.surpriseValue ? Number(product.surpriseValue) : 7500;
-  const valueRange = `Jewelry inside worth $10 - $${maxVal.toLocaleString()}`;
+  const appraisedRange = `$10 - $${maxVal.toLocaleString()}`;
+  const valueRange = `Jewelry inside worth ${appraisedRange}`;
 
   return {
     id: product.id,
@@ -365,7 +373,7 @@ export const formatDbProduct = (product: any): ProductResponseDTO => {
         { stars: 2, percentage: 1, count: 0 },
         { stars: 1, percentage: 0, count: 0 },
       ],
-      appraisedValueRange: valueRange,
+      appraisedValueRange: appraisedRange,
       guaranteeBadge: '100% Win Guarantee Verified',
     },
     createdAt: product.createdAt,

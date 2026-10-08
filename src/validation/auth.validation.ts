@@ -28,3 +28,22 @@ export const resetPasswordSchema = z.object({
     newPassword: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
   }),
 });
+
+export const googleLoginSchema = z.object({
+  body: z
+    .object({
+      idToken: z.string().trim().optional(),
+      credential: z.string().trim().optional(),
+      accessToken: z.string().trim().optional(),
+      email: z.string().trim().email({ message: 'Invalid email address' }).optional(),
+      firstName: z.string().trim().optional(),
+      lastName: z.string().trim().optional(),
+    })
+    .refine(
+      (data) => Boolean(data.idToken || data.credential || data.accessToken || data.email),
+      {
+        message: 'Must provide either idToken, credential, accessToken, or email',
+      }
+    ),
+});
+
