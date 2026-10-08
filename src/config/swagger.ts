@@ -14,6 +14,10 @@ const options: swaggerJsdoc.Options = {
         url: `http://localhost:${config.port}`,
         description: 'local development server',
       },
+       {
+        url: `http://api.ilovesurprises.com:${config.port}`,
+        description: 'production server',
+      },
     ],
     components: {
       securitySchemes: {
