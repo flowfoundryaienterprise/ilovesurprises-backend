@@ -18,65 +18,24 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            git config --global --add safe.directory "*" || true
-            echo "=== Listing /var/www ==="
-            ls -la /var/www
 
-            echo "=== Deploying Backend commit 5e41958 ==="
             cd /var/www/ilovesurprises-backend
+
+            echo "Pulling latest code..."
             git fetch origin
-            git checkout Feat/Backend || git checkout -b Feat/Backend origin/Feat/Backend
-            git reset --hard 5e41958
+            git reset --hard origin/main
 
-            git show 51230de:.env > .env
-            sed -i 's/NODE_ENV=development/NODE_ENV=production/' .env
-            echo "STRIPE_SECRET_KEY=sk_test_ilovesurprises_placeholder_secret_key" >> .env
-            echo "STRIPE_WEBHOOK_SECRET=whsec_placeholder_secret_key" >> .env
-            echo "FRONTEND_URL=https://ilovesurprises.com" >> .env
-            git show 30ba198:ecosystem.config.js > ecosystem.config.js
-
-            echo "Backend verified commit: $(git log -1 --oneline)"
+            echo "Installing dependencies..."
             npm ci
+
+            echo "Generating Prisma client..."
             npx prisma generate
+
+            echo "Building application..."
             npm run build
 
-            echo "Restarting PM2 backend service..."
-            pm2 delete all || true
-            pm2 start ecosystem.config.js
-            pm2 save || true
-            sleep 3
+            echo "Reloading PM2..."
+            pm2 reload ecosystem.config.js --update-env
+
+            echo "Deployment complete!"
             pm2 status
-            echo "=== PM2 recent logs ==="
-            pm2 logs ilovesurprises-api --lines 30 --nostream || true
-
-            echo "=== Local health check on VPS ==="
-            curl -s http://localhost:3000/health || true
-
-            echo "=== Building and Deploying Frontend (efe9e26) ==="
-            rm -rf /tmp/fe_build
-            git clone --depth 1 -b main https://github.com/flowfoundryaienterprise/Ilovesurprises-frontend.git /tmp/fe_build
-            cd /tmp/fe_build
-            echo "Frontend commit: $(git log -1 --oneline)"
-            npm ci || npm install
-            npm run build
-
-            echo "=== Distributing Frontend Build to Nginx Web Roots ==="
-            for ROOT in $(grep -hoP 'root\s+\K[^;]+' /etc/nginx/sites-enabled/* 2>/dev/null); do
-              if [ -d "$ROOT" ] && [ "$ROOT" != "/var/www/ilovesurprises-backend" ]; then
-                echo "Copying to Nginx root: $ROOT"
-                sudo rm -rf "$ROOT"/* 2>/dev/null || rm -rf "$ROOT"/* 2>/dev/null || true
-                sudo cp -r /tmp/fe_build/dist/* "$ROOT"/ 2>/dev/null || cp -r /tmp/fe_build/dist/* "$ROOT"/ 2>/dev/null || true
-              fi
-            done
-
-            for TARGET in /var/www/html /var/www/ilovesurprises-platform/dist /var/www/ilovesurprises-frontend/dist /var/www/frontend/dist /usr/share/nginx/html; do
-              if [ -d "$TARGET" ]; then
-                echo "Copying to fallback target: $TARGET"
-                sudo rm -rf "$TARGET"/* 2>/dev/null || rm -rf "$TARGET"/* 2>/dev/null || true
-                sudo cp -r /tmp/fe_build/dist/* "$TARGET"/ 2>/dev/null || cp -r /tmp/fe_build/dist/* "$TARGET"/ 2>/dev/null || true
-              fi
-            done
-
-            sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || true
-            rm -rf /tmp/fe_build
-            echo "Deployment finished successfully!"
