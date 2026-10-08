@@ -9,7 +9,10 @@ import { notFoundHandler, errorHandler } from './middlewares/error.middleware';
 export const createApp = (): Application => {
   const app = express();
 
-  app.use(cors());
+  app.use(cors({
+    origin: 'https://ilovesurprises.com',
+      credentials: true
+  }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
