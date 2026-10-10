@@ -1,15 +1,19 @@
 import { createApp } from './app';
 import { config } from './config/env';
 import { prisma } from './lib/prisma';
+import { warmupProductCatalog } from './services/product.service';
 
 const app = createApp();
 
-// ─── Fix 2: Warm up Prisma connection pool before serving traffic ───
-// This eliminates the 500–800ms TCP handshake penalty on the very first request.
-async function warmupDatabase(): Promise<void> {
+// ─── Warm up Prisma connection pool and product cache before serving traffic ───
+async function warmupServer(): Promise<void> {
   try {
     await prisma.$queryRaw`SELECT 1`;
     console.log('✅ Database connection pool warmed up.');
+    // Pre-warm all key collections and categories into memory
+    warmupProductCatalog().catch((err) => {
+      console.warn('⚠️ Product catalog pre-warm notice:', err?.message);
+    });
   } catch (err) {
     console.warn('⚠️  DB warmup failed (non-fatal):', err);
   }
@@ -20,8 +24,8 @@ const server = app.listen(config.port, async () => {
   console.log(`Health check: http://localhost:${config.port}/health`);
   console.log(`Swagger: http://localhost:${config.port}/api-docs`);
   console.log(`Environment: ${config.nodeEnv}`);
-  // Kick off warmup without blocking the server listen
-  warmupDatabase();
+  // Kick off warmup in background
+  warmupServer();
 });
  
 const handleShutdown = async (signal: string) => {
