@@ -41,9 +41,29 @@ export const createReview = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+export const getProductsBatch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    let ids: string[] = [];
+    if (req.method === 'POST' && Array.isArray(req.body?.ids)) {
+      ids = req.body.ids;
+    } else if (req.query.ids) {
+      ids = String(req.query.ids).split(',').map((s) => s.trim()).filter(Boolean);
+    }
+
+    const products = await productService.getProductsBatch(ids);
+    res.status(200).json({
+      status: 'success',
+      data: { products, count: products.length },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Backward compatibility object export
 export const productController = {
   listProducts,
   getProduct,
+  getProductsBatch,
   createReview,
 };

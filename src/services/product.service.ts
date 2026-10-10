@@ -9,6 +9,34 @@ import {
 } from '../types/product.types';
 import { Prisma, ProductStatus } from '@prisma/client';
 
+// ─── In-Memory Cache (Fix 1: eliminates repeated 3000ms Supabase round-trips) ───
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+const productListCache = new Map<string, CacheEntry<any>>();
+const productDetailCache = new Map<string, CacheEntry<ProductResponseDTO>>();
+const LIST_CACHE_TTL_MS = 5 * 60 * 1000;   // 5 minutes
+const DETAIL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function getCached<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
+  const entry = cache.get(key);
+  if (entry && Date.now() < entry.expiresAt) return entry.data;
+  if (entry) cache.delete(key); // prune expired
+  return null;
+}
+
+function setCached<T>(cache: Map<string, CacheEntry<T>>, key: string, data: T, ttl: number): void {
+  cache.set(key, { data, expiresAt: Date.now() + ttl });
+}
+
+/** Invalidate all product caches (call after create/update/delete) */
+export function invalidateProductCaches(): void {
+  productListCache.clear();
+  productDetailCache.clear();
+}
+
 export const DEFAULT_CATALOG: readonly ProductResponseDTO[] = [
   {
     id: 'prod-halloween-bath-bomb-01',
@@ -389,6 +417,11 @@ export const listProducts = async (query: ListProductsQueryDTO): Promise<{
   const limit = Math.max(1, Math.min(100, query.limit || 20));
   const skip = (page - 1) * limit;
 
+  // ── Cache check: serve in <5ms for repeated/paginated requests ──
+  const cacheKey = JSON.stringify({ page, limit, ...query });
+  const cachedResult = getCached(productListCache, cacheKey);
+  if (cachedResult) return cachedResult;
+
   try {
     const where: Prisma.productsWhereInput = {};
 
@@ -447,7 +480,7 @@ export const listProducts = async (query: ListProductsQueryDTO): Promise<{
     ]);
 
     if (dbProducts.length > 0) {
-      return {
+      const result = {
         products: dbProducts.map(formatDbProduct),
         pagination: {
           total: dbTotal,
@@ -456,6 +489,8 @@ export const listProducts = async (query: ListProductsQueryDTO): Promise<{
           totalPages: Math.ceil(dbTotal / limit),
         },
       };
+      setCached(productListCache, cacheKey, result, LIST_CACHE_TTL_MS);
+      return result;
     }
   } catch (err: any) {
     console.warn('DB query in listProducts fell back to default catalog:', err.message);
@@ -482,7 +517,7 @@ export const listProducts = async (query: ListProductsQueryDTO): Promise<{
   const total = filtered.length;
   const paginated = filtered.slice(skip, skip + limit);
 
-  return {
+  const fallbackResult = {
     products: paginated,
     pagination: {
       total,
@@ -491,10 +526,16 @@ export const listProducts = async (query: ListProductsQueryDTO): Promise<{
       totalPages: Math.ceil(total / limit),
     },
   };
+  setCached(productListCache, cacheKey, fallbackResult, LIST_CACHE_TTL_MS);
+  return fallbackResult;
 };
 
 export const getProductByIdOrSlug = async (identifier: string): Promise<ProductResponseDTO> => {
   const cleanId = identifier.trim();
+
+  // ── Cache check: serve individual products in <5ms ──
+  const cached = getCached(productDetailCache, cleanId);
+  if (cached) return cached;
 
   try {
     const dbProduct = await prisma.products.findFirst({
@@ -513,7 +554,16 @@ export const getProductByIdOrSlug = async (identifier: string): Promise<ProductR
     });
 
     if (dbProduct) {
-      return formatDbProduct(dbProduct);
+      const formatted = formatDbProduct(dbProduct);
+      setCached(productDetailCache, cleanId, formatted, DETAIL_CACHE_TTL_MS);
+      // Also cache by slug and id cross-keys
+      if (formatted.slug && formatted.slug !== cleanId) {
+        setCached(productDetailCache, formatted.slug, formatted, DETAIL_CACHE_TTL_MS);
+      }
+      if (formatted.id && formatted.id !== cleanId) {
+        setCached(productDetailCache, formatted.id, formatted, DETAIL_CACHE_TTL_MS);
+      }
+      return formatted;
     }
   } catch (err: any) {
     console.warn('DB query in getProductByIdOrSlug failed, checking catalog:', err.message);
@@ -524,12 +574,95 @@ export const getProductByIdOrSlug = async (identifier: string): Promise<ProductR
   );
 
   if (matched) {
+    setCached(productDetailCache, cleanId, matched, DETAIL_CACHE_TTL_MS);
     return matched;
   }
 
   const error: any = new Error(`Product with identifier "${identifier}" not found`);
   error.statusCode = 404;
   throw error;
+};
+
+export const getProductsBatch = async (ids: string[]): Promise<ProductResponseDTO[]> => {
+  if (!ids || ids.length === 0) return [];
+  const cleanIds = ids.map((id) => id.trim()).filter(Boolean);
+  if (cleanIds.length === 0) return [];
+
+  const results: ProductResponseDTO[] = [];
+  const missingIds: string[] = [];
+
+  // 1. Check in-memory cache first
+  for (const id of cleanIds) {
+    const cached = getCached(productDetailCache, id);
+    if (cached) {
+      results.push(cached);
+    } else {
+      missingIds.push(id);
+    }
+  }
+
+  if (missingIds.length === 0) return results;
+
+  // 2. Query DB in a single batch with IN clause
+  try {
+    const dbProducts = await prisma.products.findMany({
+      where: {
+        OR: [
+          { id: { in: missingIds } },
+          { slug: { in: missingIds } },
+        ],
+      },
+      include: {
+        categories: true,
+        product_images: { orderBy: { sortOrder: 'asc' } },
+        product_variants: true,
+        product_reviews: {
+          include: { users: { select: { firstName: true, lastName: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    const foundMap = new Map<string, ProductResponseDTO>();
+    for (const p of dbProducts) {
+      const formatted = formatDbProduct(p);
+      setCached(productDetailCache, formatted.id, formatted, DETAIL_CACHE_TTL_MS);
+      if (formatted.slug) {
+        setCached(productDetailCache, formatted.slug, formatted, DETAIL_CACHE_TTL_MS);
+      }
+      foundMap.set(formatted.id.toLowerCase(), formatted);
+      if (formatted.slug) {
+        foundMap.set(formatted.slug.toLowerCase(), formatted);
+      }
+      results.push(formatted);
+    }
+
+    // 3. Fallback catalog for anything still missing
+    const remainingMissing = missingIds.filter(
+      (id) => !foundMap.has(id.toLowerCase())
+    );
+    for (const id of remainingMissing) {
+      const matched = DEFAULT_CATALOG.find(
+        (p) => p.id === id || p.slug.toLowerCase() === id.toLowerCase()
+      );
+      if (matched) {
+        setCached(productDetailCache, id, matched, DETAIL_CACHE_TTL_MS);
+        results.push(matched);
+      }
+    }
+  } catch (err: any) {
+    console.warn('DB batch query failed, checking catalog:', err.message);
+    for (const id of missingIds) {
+      const matched = DEFAULT_CATALOG.find(
+        (p) => p.id === id || p.slug.toLowerCase() === id.toLowerCase()
+      );
+      if (matched) {
+        results.push(matched);
+      }
+    }
+  }
+
+  return results;
 };
 
 export const createReview = async (productId: string, userId: string, data: CreateReviewDTO): Promise<any> => {

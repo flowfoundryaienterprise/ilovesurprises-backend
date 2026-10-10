@@ -69,6 +69,14 @@ productRouter.get('/', validateRequest(listProductsSchema), (req, res, next) => 
   productController.listProducts(req, res, next);
 });
 
+productRouter.get('/batch', (req, res, next) => {
+  productController.getProductsBatch(req, res, next);
+});
+
+productRouter.post('/batch', (req, res, next) => {
+  productController.getProductsBatch(req, res, next);
+});
+
 /**
  * @openapi
  * /api/products/{slugOrId}:
