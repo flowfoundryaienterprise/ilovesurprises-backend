@@ -4,6 +4,7 @@ import * as productService from '../services/product.service';
 export const listProducts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const result = await productService.listProducts(req.query as any);
+    res.setHeader('Cache-Control', 'public, max-age=120, s-maxage=600, stale-while-revalidate=86400');
     res.status(200).json({
       status: 'success',
       data: result,
@@ -17,6 +18,7 @@ export const getProduct = async (req: Request, res: Response, next: NextFunction
   try {
     const identifier = String(req.params.slugOrId || req.params.id);
     const product = await productService.getProductByIdOrSlug(identifier);
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=86400');
     res.status(200).json({
       status: 'success',
       data: { product },
@@ -51,6 +53,7 @@ export const getProductsBatch = async (req: Request, res: Response, next: NextFu
     }
 
     const products = await productService.getProductsBatch(ids);
+    res.setHeader('Cache-Control', 'public, max-age=180, s-maxage=1200, stale-while-revalidate=86400');
     res.status(200).json({
       status: 'success',
       data: { products, count: products.length },
