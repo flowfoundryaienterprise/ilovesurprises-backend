@@ -9,6 +9,23 @@ import { storefrontRouter } from './storefront.routes';
 import { affiliateRouter } from './affiliate.routes';
 import { commissionRouter } from './commission.routes';
 
+import { storefrontController } from '../controllers/storefront.controller';
+import { uploadImageMiddleware } from '../middlewares/upload.middleware';
+
+const handleMulterUpload = (req: any, res: any, next: any) => {
+  if (req.is('multipart/form-data')) {
+    uploadImageMiddleware.any()(req, res, (err) => {
+      if (err) return next(err);
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        req.file = req.files[0];
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+};
+
 export const apiRouter = Router();
 
 apiRouter.use('/health', healthRouter);
@@ -20,6 +37,7 @@ apiRouter.use('/cart', cartRouter);
 apiRouter.use('/storefront', storefrontRouter);
 apiRouter.use('/affiliates', affiliateRouter);
 apiRouter.use('/commission', commissionRouter);
+apiRouter.post('/upload', handleMulterUpload, storefrontController.uploadImage);
 
 export {
   healthRouter,

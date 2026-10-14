@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as adminService from '../services/admin.service';
-import * as storefrontService from '../services/storefront.service';
 import * as productService from '../services/product.service';
+import { storefrontController } from './storefront.controller';
+
+// ─── USER MANAGEMENT (ADMIN) ──────────────────────────────────────────────────
 
 export const listUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -56,56 +58,44 @@ export const updateUserRole = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const getStorefrontConfig = async (
-  _req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const config = await storefrontService.getStorefrontConfig(false);
-    res.status(200).json({
-      status: 'success',
-      data: config,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+// ─── STOREFRONT CUSTOMIZATION (ADMIN) ─────────────────────────────────────────
 
-export const updateShowcaseCard = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const cardKey = String(req.params.cardKey);
-    const updatedCard = await storefrontService.updateShowcaseCard(cardKey, req.body);
-    res.status(200).json({
-      status: 'success',
-      message: `Showcase card "${cardKey}" updated successfully`,
-      data: { showcaseCard: updatedCard },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+export const getStorefrontConfig = storefrontController.getAdminStorefrontConfig;
+export const updateFullStorefrontConfig = storefrontController.updateFullStorefrontConfig;
+export const resetStorefrontDefaults = storefrontController.resetStorefrontDefaults;
 
-export const updateStorefrontBanners = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const updatedBanners = await storefrontService.updateBanners(req.body);
-    res.status(200).json({
-      status: 'success',
-      message: 'Storefront banners and announcements updated successfully',
-      data: { banners: updatedBanners },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+// Hero & Tiles
+export const updateHeroContent = storefrontController.updateHeroContent;
+export const createBenefitTile = storefrontController.createBenefitTile;
+export const updateBenefitTile = storefrontController.updateBenefitTile;
+export const deleteBenefitTile = storefrontController.deleteBenefitTile;
+
+// Showcase Cards / Collections
+export const createShowcaseCard = storefrontController.createShowcaseCard;
+export const updateShowcaseCard = storefrontController.updateShowcaseCard;
+export const deleteShowcaseCard = storefrontController.deleteShowcaseCard;
+
+// Announcements & Banners
+export const updateStorefrontBanners = storefrontController.updateStorefrontBanners;
+
+// Value Proposition
+export const updateValueProposition = storefrontController.updateValueProposition;
+
+// About Brand Story
+export const updateAboutContent = storefrontController.updateAboutContent;
+
+// FAQs
+export const createFaq = storefrontController.createFaq;
+export const updateFaq = storefrontController.updateFaq;
+export const deleteFaq = storefrontController.deleteFaq;
+
+// Footer
+export const updateFooterContent = storefrontController.updateFooterContent;
+
+// Upload
+export const uploadImage = storefrontController.uploadImage;
+
+//  PRODUCT CATALOG (ADMIN) 
 
 export const createProduct = async (
   req: Request,
@@ -166,8 +156,23 @@ export const adminController = {
   updateUser,
   updateUserRole,
   getStorefrontConfig,
+  updateFullStorefrontConfig,
+  resetStorefrontDefaults,
+  updateHeroContent,
+  createBenefitTile,
+  updateBenefitTile,
+  deleteBenefitTile,
+  createShowcaseCard,
   updateShowcaseCard,
+  deleteShowcaseCard,
   updateStorefrontBanners,
+  updateValueProposition,
+  updateAboutContent,
+  createFaq,
+  updateFaq,
+  deleteFaq,
+  updateFooterContent,
+  uploadImage,
   createProduct,
   updateProduct,
   deleteProduct,

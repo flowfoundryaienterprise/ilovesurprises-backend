@@ -110,6 +110,72 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        HeroBenefitTile: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'hidden-jewelry' },
+            title: { type: 'string', example: 'Hidden Jewelry Reveals' },
+            subtitle: { type: 'string', example: 'Real jewelry in every product' },
+            iconName: { type: 'string', example: 'Gem' },
+            actionType: { type: 'string', example: 'shop' },
+          },
+        },
+        HeroContent: {
+          type: 'object',
+          properties: {
+            desktopBannerImage: { type: 'string', example: '/assets/ilovesurprises/banners/New banner.jpeg' },
+            mobileBannerImage: { type: 'string', example: '/assets/ilovesurprises/banners/mobile-banner.jpg' },
+            headline: { type: 'string', example: 'ILoveSurprises.com — Discover jewelry, cash, and surprises inside every candle & bath bomb' },
+            subheadline: { type: 'string', example: 'Handcrafted soy candles with authentic real cash and luxury jewelry reveals.' },
+            benefitTiles: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/HeroBenefitTile' },
+            },
+          },
+        },
+        ValueProposition: {
+          type: 'object',
+          properties: {
+            eyebrow: { type: 'string', example: '100% Real Reveal Guarantee' },
+            title: { type: 'string', example: 'Why Customers Love I Love Surprises' },
+            description: { type: 'string', example: 'Every single hand-poured candle conceals an authentic cash prize or genuine fine jewelry.' },
+            points: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+        },
+        AboutContent: {
+          type: 'object',
+          properties: {
+            badge: { type: 'string', example: 'Our Brand Story & Craftsmanship' },
+            headline: { type: 'string', example: 'Where Luxury Fragrance Meets the Thrill of Real Surprises' },
+            storyText: { type: 'string', example: 'Hand-poured 100% natural soy wax candles crafted with artisan care in the USA.' },
+            naturalSoyStat: { type: 'string', example: '100% Natural Soy' },
+            unboxingsStat: { type: 'string', example: '85,000+ Unboxings' },
+            realCashStat: { type: 'string', example: '$2 to $2.5K Real Cash' },
+          },
+        },
+        FaqItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'faq-1' },
+            question: { type: 'string', example: 'What is I Love Surprises?' },
+            answer: { type: 'string', example: 'I Love Surprises offers fun products designed around the excitement of discovering a surprise.' },
+            category: { type: 'string', example: 'About Surprises' },
+          },
+        },
+        FooterContent: {
+          type: 'object',
+          properties: {
+            newsletterTitle: { type: 'string', example: 'Unlock 15% Off Your Next Surprise & Weekly Cash Drop Alerts' },
+            newsletterSubtitle: { type: 'string', example: 'Join over 85,000+ unboxing fans.' },
+            copyrightText: { type: 'string', example: '© 2026 ILoveSurprises.com. All rights reserved.' },
+            supportEmail: { type: 'string', example: 'support@ilovesurprises.com' },
+            supportPhone: { type: 'string', example: '1-800-SURPRISE' },
+            guaranteeText: { type: 'string', example: '256-Bit SSL Encrypted Bank-Grade Checkout' },
+          },
+        },
         AuthResponse: {
           type: 'object',
           properties: {

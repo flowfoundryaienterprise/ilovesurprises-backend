@@ -10,8 +10,33 @@ import {
 } from '../validation/admin.validation';
 import {
   updateShowcaseCardSchema,
+  createShowcaseCardSchema,
   updateStorefrontBannersSchema,
+  updateFullStorefrontSchema,
+  updateHeroSchema,
+  createBenefitTileSchema,
+  updateBenefitTileSchema,
+  updateValuePropositionSchema,
+  updateAboutContentSchema,
+  createFaqSchema,
+  updateFaqSchema,
+  updateFooterSchema,
 } from '../validation/storefront.validation';
+import { uploadImageMiddleware } from '../middlewares/upload.middleware';
+
+const handleMulterUpload = (req: any, res: any, next: any) => {
+  if (req.is('multipart/form-data')) {
+    uploadImageMiddleware.any()(req, res, (err) => {
+      if (err) return next(err);
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        req.file = req.files[0];
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+};
 import {
   createProductSchema,
   updateProductSchema,
@@ -163,7 +188,7 @@ adminRouter.patch(
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Full storefront configuration including all 4 showcase cards and storewide banners.
+ *         description: Full storefront configuration including all sections.
  */
 adminRouter.get('/storefront', (req, res, next) => {
   adminController.getStorefrontConfig(req, res, next);
@@ -171,57 +196,82 @@ adminRouter.get('/storefront', (req, res, next) => {
 
 /**
  * @openapi
- * /api/admin/storefront/showcase/{cardKey}:
- *   patch:
- *     summary: Update a showcase product card
- *     description: Customize showcase title, highlight badge, tagline, CTA button text, target category key, image URI, and homepage visibility.
+ * /api/admin/storefront:
+ *   put:
+ *     summary: Publish complete storefront homepage configuration in bulk
+ *     description: Matches "Publish to Storefront" action button to save all sections live at once.
  *     tags:
  *       - Admin Storefront
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: cardKey
- *         required: true
- *         schema:
- *           type: string
- *           enum: [halloween, christmas-x, cash-candles, zodiac-cash-candles]
- *         description: Unique key or ID of the showcase card
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               displayTitle:
- *                 type: string
- *                 example: Halloween
- *               highlightBadge:
- *                 type: string
- *                 example: Holiday Priority
- *               tagline:
- *                 type: string
- *                 example: Limited-edition Halloween reveal candles & bath treats with cash and jewelry inside
- *               ctaButtonText:
- *                 type: string
- *                 example: Shop Halloween Collection
- *               targetCategoryKey:
- *                 type: string
- *                 example: Halloween
- *               showcaseImageUri:
- *                 type: string
- *                 example: https://cdn.shopify.com/s/files/1/0172/4672/products/4_Mockup_Jewelry_Jewelry_Candle_Halloween.png
- *               displayOnHomepage:
- *                 type: boolean
- *                 example: true
- *               isActive:
- *                 type: boolean
- *                 example: true
  *     responses:
  *       200:
- *         description: Showcase card updated successfully.
+ *         description: Storefront configuration published successfully.
  */
+adminRouter.put(
+  '/storefront',
+  validateRequest(updateFullStorefrontSchema),
+  (req, res, next) => {
+    adminController.updateFullStorefrontConfig(req, res, next);
+  }
+);
+
+/**
+ * @openapi
+ * /api/admin/storefront/reset:
+ *   post:
+ *     summary: Reset all storefront content to system defaults
+ *     description: Matches "Reset Defaults" button in admin suite.
+ *     tags:
+ *       - Admin Storefront
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Storefront defaults restored.
+ */
+adminRouter.post('/storefront/reset', (req, res, next) => {
+  adminController.resetStorefrontDefaults(req, res, next);
+});
+
+// --- Tab 1: Hero & Benefit Quick-Action Tiles ---
+adminRouter.patch(
+  '/storefront/hero',
+  validateRequest(updateHeroSchema),
+  (req, res, next) => {
+    adminController.updateHeroContent(req, res, next);
+  }
+);
+
+adminRouter.post(
+  '/storefront/hero/tiles',
+  validateRequest(createBenefitTileSchema),
+  (req, res, next) => {
+    adminController.createBenefitTile(req, res, next);
+  }
+);
+
+adminRouter.patch(
+  '/storefront/hero/tiles/:id',
+  validateRequest(updateBenefitTileSchema),
+  (req, res, next) => {
+    adminController.updateBenefitTile(req, res, next);
+  }
+);
+
+adminRouter.delete('/storefront/hero/tiles/:id', (req, res, next) => {
+  adminController.deleteBenefitTile(req, res, next);
+});
+
+// --- Tab 2: Priority Collections (Showcase Cards CRUD) ---
+adminRouter.post(
+  '/storefront/showcase',
+  validateRequest(createShowcaseCardSchema),
+  (req, res, next) => {
+    adminController.createShowcaseCard(req, res, next);
+  }
+);
+
 adminRouter.patch(
   '/storefront/showcase/:cardKey',
   validateRequest(updateShowcaseCardSchema),
@@ -230,53 +280,81 @@ adminRouter.patch(
   }
 );
 
-/**
- * @openapi
- * /api/admin/storefront/banners:
- *   patch:
- *     summary: Update storewide announcement and promo discount banners
- *     description: Customize the top sticky announcement copy and promotional discount code alert bar.
- *     tags:
- *       - Admin Storefront
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               topStickyAnnouncementBar:
- *                 type: object
- *                 properties:
- *                   isActive:
- *                     type: boolean
- *                     example: true
- *                   announcementCopy:
- *                     type: string
- *                     example: ⚡ FREE SHIPPING ON SURPRISE CANDLE ORDERS OVER $50 + REAL CASH PRIZES IN EVERY CANDLE!
- *               promotionalDiscountAlertBar:
- *                 type: object
- *                 properties:
- *                   isActive:
- *                     type: boolean
- *                     example: true
- *                   promoCopy:
- *                     type: string
- *                     example: Use code SURPRISE15 at checkout for 15% OFF your first surprise candle reveal!
- *                   promoCode:
- *                     type: string
- *                     example: SURPRISE15
- *     responses:
- *       200:
- *         description: Storewide banners updated successfully.
- */
+adminRouter.delete('/storefront/showcase/:cardKey', (req, res, next) => {
+  adminController.deleteShowcaseCard(req, res, next);
+});
+
+// --- Tab 3: Announcements & Promo Discount Alert ---
 adminRouter.patch(
   '/storefront/banners',
   validateRequest(updateStorefrontBannersSchema),
   (req, res, next) => {
     adminController.updateStorefrontBanners(req, res, next);
+  }
+);
+
+// --- Tab 4: Value Proposition & Guarantees ---
+adminRouter.patch(
+  '/storefront/value-proposition',
+  validateRequest(updateValuePropositionSchema),
+  (req, res, next) => {
+    adminController.updateValueProposition(req, res, next);
+  }
+);
+
+// --- Tab 5: About Brand Story & Craftsmanship ---
+adminRouter.patch(
+  '/storefront/about',
+  validateRequest(updateAboutContentSchema),
+  (req, res, next) => {
+    adminController.updateAboutContent(req, res, next);
+  }
+);
+
+// --- Tab 6: FAQ Catalog CRUD ---
+adminRouter.post(
+  '/storefront/faqs',
+  validateRequest(createFaqSchema),
+  (req, res, next) => {
+    adminController.createFaq(req, res, next);
+  }
+);
+
+adminRouter.patch(
+  '/storefront/faqs/:id',
+  validateRequest(updateFaqSchema),
+  (req, res, next) => {
+    adminController.updateFaq(req, res, next);
+  }
+);
+
+adminRouter.delete('/storefront/faqs/:id', (req, res, next) => {
+  adminController.deleteFaq(req, res, next);
+});
+
+// --- Tab 7: Storewide Footer & Legal ---
+adminRouter.patch(
+  '/storefront/footer',
+  validateRequest(updateFooterSchema),
+  (req, res, next) => {
+    adminController.updateFooterContent(req, res, next);
+  }
+);
+
+// --- Image Upload (Desktop/Mobile Hero Banners, Showcase Cards, Story Photo) ---
+adminRouter.post(
+  '/storefront/upload',
+  handleMulterUpload,
+  (req, res, next) => {
+    adminController.uploadImage(req, res, next);
+  }
+);
+
+adminRouter.post(
+  '/storefront/upload-image',
+  handleMulterUpload,
+  (req, res, next) => {
+    adminController.uploadImage(req, res, next);
   }
 );
 
