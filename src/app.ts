@@ -7,6 +7,7 @@ import { healthRouter } from './routes/health.route';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { notFoundHandler, errorHandler } from './middlewares/error.middleware';
+import { paymentController } from './controllers/payment.controller';
 
 export const createApp = (): Application => {
   const app = express();
@@ -31,6 +32,8 @@ export const createApp = (): Application => {
     },
     credentials: true,
   }));
+  // Stripe webhook: must receive the raw body, so it is registered before express.json().
+  app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), paymentController.handleWebhook);
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
   app.use(cookieParser());
@@ -57,6 +60,7 @@ export const createApp = (): Application => {
           storefront: '/api/storefront',
           affiliates: '/api/affiliates',
           commission: '/api/commission',
+          payments: '/api/payments',
         },
       },
     });
