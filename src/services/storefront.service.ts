@@ -568,7 +568,28 @@ const ensureInitialized = async (): Promise<void> => {
         .sort((a, b) => a.sortOrder - b.sortOrder);
 
       if (showcaseInDb.length > 0) {
-        showcaseCardsCache = showcaseInDb.map((b) => {
+        // Legacy data has two rows per card (`<key>` and `showcase-<key>`).
+        // Keep only the most recently updated row for each cardKey.
+        const cardKeyOf = (b: (typeof showcaseInDb)[number]): string => {
+          try {
+            const meta = b.linkUrl ? JSON.parse(b.linkUrl) : {};
+            if (meta.cardKey) return meta.cardKey;
+          } catch {
+            // ignore
+          }
+          return b.id.replace(/^showcase-/, '');
+        };
+        const latestByKey = new Map<string, (typeof showcaseInDb)[number]>();
+        for (const b of showcaseInDb) {
+          const key = cardKeyOf(b);
+          const existing = latestByKey.get(key);
+          if (!existing || new Date(b.updatedAt).getTime() > new Date(existing.updatedAt).getTime()) {
+            latestByKey.set(key, b);
+          }
+        }
+        const uniqueShowcase = showcaseInDb.filter((b) => latestByKey.get(cardKeyOf(b)) === b);
+
+        showcaseCardsCache = uniqueShowcase.map((b) => {
           let meta: any = {};
           try {
             if (b.linkUrl) meta = JSON.parse(b.linkUrl);
