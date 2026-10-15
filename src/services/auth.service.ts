@@ -169,92 +169,44 @@ import { GoogleLoginDTO } from '../types/auth.types';
 
 const googleClient = new OAuth2Client(config.googleClientId);
 
+const invalidGoogleToken = () => Object.assign(new Error('Invalid or expired Google token'), { statusCode: 401 });
+
 export async function verifyGoogleIdToken(token: string): Promise<any> {
+  if (!config.googleClientId) throw Object.assign(new Error('Google login is not configured'), { statusCode: 503 });
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: config.googleClientId ? config.googleClientId : undefined,
-    });
-    return ticket.getPayload();
-  } catch (err: any) {
-    try {
-      const resp = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
-      if (resp.ok) {
-        return await resp.json();
-      }
-    } catch (_) {}
-    throw new Error('Invalid or expired Google token: ' + err.message);
-  }
+    const ticket = await googleClient.verifyIdToken({ idToken: token, audience: config.googleClientId });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.sub || !payload.email || payload.email_verified !== true ||
+        payload.aud !== config.googleClientId ||
+        !['accounts.google.com', 'https://accounts.google.com'].includes(payload.iss) ||
+        !payload.exp || payload.exp <= Date.now() / 1000) throw invalidGoogleToken();
+    return payload;
+  } catch { throw invalidGoogleToken(); }
 }
 
 export async function fetchGoogleUserInfo(accessToken: string): Promise<any> {
-  const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!resp.ok) {
-    throw new Error('Failed to fetch user profile from Google');
-  }
-  return await resp.json();
+  if (!config.googleClientId) throw Object.assign(new Error('Google login is not configured'), { statusCode: 503 });
+  try {
+    const info = await googleClient.getTokenInfo(accessToken);
+    if (info.aud !== config.googleClientId || info.expiry_date <= Date.now()) throw invalidGoogleToken();
+    const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: 'Bearer ' + accessToken }, signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) throw invalidGoogleToken();
+    const payload = await resp.json() as any;
+    if (!payload.sub || !payload.email || payload.email_verified !== true ||
+        (info.sub && info.sub !== payload.sub)) throw invalidGoogleToken();
+    return payload;
+  } catch { throw invalidGoogleToken(); }
 }
 
 export const googleLogin = async (data: GoogleLoginDTO): Promise<AuthResponseDTO> => {
-  let email: string | undefined = data.email?.toLowerCase().trim();
-  let firstName: string | null = data.firstName?.trim() || null;
-  let lastName: string | null = data.lastName?.trim() || null;
-
   const rawToken = data.idToken || data.credential;
-
-  if (rawToken) {
-    const payload = await verifyGoogleIdToken(rawToken);
-    if (!payload || !payload.email) {
-      const error: any = new Error('Google token did not provide a valid email address');
-      error.statusCode = 400;
-      throw error;
-    }
-    email = payload.email.toLowerCase().trim();
-
-    // Extract first name and last name from Google payload
-    if (payload.given_name) {
-      firstName = payload.given_name.trim();
-    }
-    if (payload.family_name) {
-      lastName = payload.family_name.trim();
-    }
-    if (!firstName && payload.name) {
-      const parts = payload.name.trim().split(/\s+/);
-      firstName = parts[0] || null;
-      if (!lastName && parts.length > 1) {
-        lastName = parts.slice(1).join(' ') || null;
-      }
-    }
-  } else if (data.accessToken) {
-    const userInfo = await fetchGoogleUserInfo(data.accessToken);
-    if (!userInfo || !userInfo.email) {
-      const error: any = new Error('Google access token did not return an email');
-      error.statusCode = 400;
-      throw error;
-    }
-    email = userInfo.email.toLowerCase().trim();
-    if (userInfo.given_name) {
-      firstName = userInfo.given_name.trim();
-    }
-    if (userInfo.family_name) {
-      lastName = userInfo.family_name.trim();
-    }
-    if (!firstName && userInfo.name) {
-      const parts = userInfo.name.trim().split(/\s+/);
-      firstName = parts[0] || null;
-      if (!lastName && parts.length > 1) {
-        lastName = parts.slice(1).join(' ') || null;
-      }
-    }
-  }
-
-  if (!email) {
-    const error: any = new Error('Email is required for Google login');
-    error.statusCode = 400;
-    throw error;
-  }
+  if (!rawToken && !data.accessToken) throw invalidGoogleToken();
+  const payload = rawToken ? await verifyGoogleIdToken(rawToken) : await fetchGoogleUserInfo(data.accessToken!);
+  const email = payload.email.toLowerCase().trim();
+  const firstName = payload.given_name?.trim() || null;
+  const lastName = payload.family_name?.trim() || null;
 
   // Look for existing user
   let user = await prisma.user.findUnique({

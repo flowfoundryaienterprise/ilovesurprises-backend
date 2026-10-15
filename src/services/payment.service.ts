@@ -95,8 +95,10 @@ export const createCheckout = async (userId: string, input: CreateCheckoutDTO, r
   const isCod = input.paymentMethod === 'cod';
   if (!isCod) getStripe(); // fail fast before writing an order
 
-  const productIds = [...new Set(input.items.map((i) => i.productId))];
-  const products = await prisma.products.findMany({ where: { id: { in: productIds } } });
+  const quantities = new Map<string, number>();
+  for (const item of input.items) quantities.set(item.productId, (quantities.get(item.productId) || 0) + item.quantity);
+  const productIds = [...quantities.keys()];
+  const products = await prisma.products.findMany({ where: { id: { in: productIds } }, include: { product_variants: true } });
   const productMap = new Map(products.map((p) => [p.id, p]));
 
   const lines = input.items.map((item) => {
@@ -104,8 +106,14 @@ export const createCheckout = async (userId: string, input: CreateCheckoutDTO, r
     if (!product || product.status !== 'ACTIVE') {
       throw new PaymentError('An item in your bag is no longer available. Please remove it and try again.');
     }
-    if (product.stock < item.quantity) {
+    if (product.stock < quantities.get(item.productId)!) {
       throw new PaymentError(`'${product.name}' only has ${product.stock} left in stock.`);
+    }
+    if (product.product_variants.some((variant) => variant.isActive)) {
+      throw new PaymentError('Variant checkout is temporarily unavailable for this product.', 409);
+    }
+    if (item.selectedRingSize && !product.ringSizes.includes(item.selectedRingSize)) {
+      throw new PaymentError('Invalid ring size for this product.');
     }
     const unitCents = toCents(product.price);
     return { item, product, unitCents, lineCents: unitCents * item.quantity };
@@ -153,13 +161,30 @@ export const createCheckout = async (userId: string, input: CreateCheckoutDTO, r
 
   const now = new Date();
   const orderId = crypto.randomUUID();
-  const order = await prisma.orders.create({
+  const order = await prisma.$transaction(async (tx) => {
+    // Conditional updates lock inventory rows. Stable ordering avoids cross-product deadlocks.
+    for (const productId of [...productIds].sort()) {
+      const quantity = quantities.get(productId)!;
+      const reserved = await tx.products.updateMany({
+        where: { id: productId, status: 'ACTIVE', stock: { gte: quantity }, price: productMap.get(productId)!.price },
+        data: { stock: { decrement: quantity } },
+      });
+      if (reserved.count !== 1) throw new PaymentError('Inventory or price changed. Please refresh your bag.', 409);
+      const product = await tx.products.findUniqueOrThrow({ where: { id: productId } });
+      await tx.inventory_logs.create({ data: {
+        id: crypto.randomUUID(), productId, changeQty: -quantity,
+        previousQty: product.stock + quantity, newQty: product.stock,
+        reason: 'Reservation for order ' + orderId,
+      } });
+    }
+    return tx.orders.create({
     data: {
       id: orderId,
       orderNumber: generateOrderNumber(),
       userId,
       status: isCod ? 'CONFIRMED' : 'PENDING',
       paymentStatus: 'PENDING',
+      inventoryDeducted: true,
       paymentMethod: isCod ? 'COD' : 'STRIPE',
       currency: 'USD',
       subtotal: toMoney(subtotalCents),
@@ -175,6 +200,10 @@ export const createCheckout = async (userId: string, input: CreateCheckoutDTO, r
         couponId: coupon?.id,
       } as Prisma.InputJsonValue,
       updatedAt: now,
+      payment_transactions: { create: {
+        id: crypto.randomUUID(), paymentMethod: isCod ? 'COD' : 'STRIPE',
+        amount: toMoney(totalCents), currency: 'USD', status: 'PENDING', updatedAt: now,
+      } },
       order_items: {
         create: lines.map(({ item, product, unitCents, lineCents }) => ({
           id: crypto.randomUUID(),
@@ -192,6 +221,8 @@ export const createCheckout = async (userId: string, input: CreateCheckoutDTO, r
         })),
       },
     },
+  });
+
   });
 
   if (isCod) {
@@ -246,17 +277,9 @@ export const createCheckout = async (userId: string, input: CreateCheckoutDTO, r
     { idempotencyKey: `checkout-${order.id}` }
   );
 
-  await prisma.payment_transactions.create({
-    data: {
-      id: crypto.randomUUID(),
-      orderId: order.id,
-      paymentMethod: 'STRIPE',
-      amount: toMoney(totalCents),
-      currency: 'USD',
-      status: 'PENDING',
-      gatewayResponse: { checkoutSessionId: session.id },
-      updatedAt: now,
-    },
+  await prisma.payment_transactions.updateMany({
+    where: { orderId: order.id, status: 'PENDING' },
+    data: { gatewayResponse: { checkoutSessionId: session.id }, updatedAt: new Date() },
   });
 
   return { order: null, orderId: order.id, checkoutUrl: session.url, sessionId: session.id };
@@ -272,13 +295,13 @@ export const markOrderPaid = async (session: Stripe.Checkout.Session): Promise<v
   if (!orderId || session.payment_status !== 'paid') return;
 
   const order = await prisma.orders.findUnique({ where: { id: orderId }, include: { order_items: true } });
-  if (!order) return;
+  if (!order || order.paymentMethod !== 'STRIPE') throw new PaymentError('Payment order cannot be reconciled', 409);
 
   if (session.amount_total !== toCents(order.totalAmount) || session.currency !== 'usd') {
     console.error(
       `[payments] Amount mismatch for order ${order.orderNumber}: Stripe ${session.amount_total} ${session.currency}, order ${toCents(order.totalAmount)} usd`
     );
-    return;
+    throw new PaymentError('Payment amount requires reconciliation', 409);
   }
 
   const paymentIntentId =
@@ -286,7 +309,7 @@ export const markOrderPaid = async (session: Stripe.Checkout.Session): Promise<v
 
   const transitioned = await prisma.$transaction(async (tx) => {
     const { count } = await tx.orders.updateMany({
-      where: { id: orderId, paymentStatus: { not: 'PAID' } },
+      where: { id: orderId, paymentStatus: 'PENDING', status: { not: 'CANCELLED' } },
       data: { paymentStatus: 'PAID', status: 'CONFIRMED', inventoryDeducted: true, updatedAt: new Date() },
     });
     if (count === 0) return false;
@@ -301,12 +324,14 @@ export const markOrderPaid = async (session: Stripe.Checkout.Session): Promise<v
       },
     });
 
-    for (const item of order.order_items) {
+    if (!order.inventoryDeducted) for (const item of order.order_items) {
       if (!item.productId) continue;
-      const product = await tx.products.update({
-        where: { id: item.productId },
+      const updated = await tx.products.updateMany({
+        where: { id: item.productId, stock: { gte: item.quantity } },
         data: { stock: { decrement: item.quantity } },
       });
+      if (updated.count !== 1) throw new PaymentError('Legacy order requires inventory reconciliation', 409);
+      const product = await tx.products.findUniqueOrThrow({ where: { id: item.productId } });
       await tx.inventory_logs.create({
         data: {
           id: crypto.randomUUID(),
@@ -338,23 +363,57 @@ export const markOrderPaid = async (session: Stripe.Checkout.Session): Promise<v
     return true;
   });
 
-  if (!transitioned) return;
-
-  await clearCart(order.userId).catch((err) => console.warn('[payments] Cart clear failed:', err?.message));
-  await processOrderCommission(orderId).catch((err) =>
-    console.error(`[payments] Commission processing failed for ${order.orderNumber}:`, err?.message)
-  );
+  // A verified webhook retry must retry the idempotent commission transaction.
+  if (transitioned || order.paymentStatus === 'PAID') await processOrderCommission(orderId);
+  if (transitioned) await clearCart(order.userId);
 };
 
 const markOrderFailed = async (orderId: string, reason: string) => {
-  await prisma.orders.updateMany({
-    where: { id: orderId, paymentStatus: 'PENDING' },
-    data: { paymentStatus: 'FAILED', status: 'CANCELLED', updatedAt: new Date() },
+  await prisma.$transaction(async (tx) => {
+    const changed = await tx.orders.updateMany({
+      where: { id: orderId, paymentStatus: 'PENDING' },
+      data: { paymentStatus: 'FAILED', status: 'CANCELLED', updatedAt: new Date() },
+    });
+    if (!changed.count) return;
+    const order = await tx.orders.findUniqueOrThrow({ where: { id: orderId }, include: { order_items: true } });
+    if (order.inventoryDeducted) {
+      for (const item of [...order.order_items].sort((a, b) => (a.productId || '').localeCompare(b.productId || ''))) {
+        if (!item.productId) continue;
+        const product = await tx.products.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+        await tx.inventory_logs.create({ data: {
+          id: crypto.randomUUID(), productId: item.productId, changeQty: item.quantity,
+          previousQty: product.stock - item.quantity, newQty: product.stock, reason: 'Release for order ' + orderId,
+        } });
+      }
+      await tx.orders.update({ where: { id: orderId }, data: { inventoryDeducted: false } });
+    }
+    await tx.payment_transactions.updateMany({
+      where: { orderId, status: 'PENDING' },
+      data: { status: 'FAILED', errorMessage: reason, updatedAt: new Date() },
+    });
   });
-  await prisma.payment_transactions.updateMany({
-    where: { orderId, status: 'PENDING' },
-    data: { status: 'FAILED', errorMessage: reason, updatedAt: new Date() },
-  });
+};
+
+export const cancelUnpaidOrder = async (orderId: string, userId: string) => {
+  const order = await prisma.orders.findFirst({ where: { id: orderId, userId }, include: { payment_transactions: true } });
+  if (!order) throw new PaymentError('Order not found.', 404);
+  if (order.status === 'CANCELLED') return getOrderForUser(orderId, userId);
+  if (order.paymentStatus !== 'PENDING' || !['PENDING', 'CONFIRMED'].includes(order.status)) {
+    throw new PaymentError('This order cannot be cancelled.', 409);
+  }
+  if (order.paymentMethod === 'STRIPE') {
+    const sessionId = (order.payment_transactions[0]?.gatewayResponse as { checkoutSessionId?: string } | null)?.checkoutSessionId;
+    // Unknown gateway outcome requires reconciliation; never release potentially sold stock.
+    if (!sessionId) throw new PaymentError('Checkout requires payment reconciliation before cancellation.', 409);
+    const session = await getStripe().checkout.sessions.retrieve(sessionId);
+    if (session.status === 'complete') {
+      if (session.payment_status === 'paid') await markOrderPaid(session);
+      throw new PaymentError('Payment has completed or is processing; cancellation is unavailable.', 409);
+    }
+    if (session.status === 'open') await getStripe().checkout.sessions.expire(sessionId);
+  }
+  await markOrderFailed(orderId, 'customer_cancelled');
+  return getOrderForUser(orderId, userId);
 };
 
 /** Verifies and applies a Stripe webhook event. Throws on a bad signature. */

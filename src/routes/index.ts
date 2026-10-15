@@ -9,9 +9,12 @@ import { storefrontRouter } from './storefront.routes';
 import { affiliateRouter } from './affiliate.routes';
 import { commissionRouter } from './commission.routes';
 import { paymentRouter } from './payment.routes';
+import { orderRouter } from './order.routes';
 
 import { storefrontController } from '../controllers/storefront.controller';
 import { uploadImageMiddleware } from '../middlewares/upload.middleware';
+import { authenticate } from '../middlewares/auth.middleware';
+import { requireRole } from '../middlewares/role.middleware';
 
 const handleMulterUpload = (req: any, res: any, next: any) => {
   if (req.is('multipart/form-data')) {
@@ -39,7 +42,8 @@ apiRouter.use('/storefront', storefrontRouter);
 apiRouter.use('/affiliates', affiliateRouter);
 apiRouter.use('/commission', commissionRouter);
 apiRouter.use('/payments', paymentRouter);
-apiRouter.post('/upload', handleMulterUpload, storefrontController.uploadImage);
+apiRouter.use('/orders', orderRouter);
+apiRouter.post('/upload', authenticate, requireRole('ADMIN'), handleMulterUpload, storefrontController.uploadImage);
 
 export {
   healthRouter,

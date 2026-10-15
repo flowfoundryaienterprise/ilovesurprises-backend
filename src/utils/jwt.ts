@@ -13,7 +13,7 @@ export const signToken = (
 
 export const verifyToken = <T>(token: string): T | null => {
   try {
-    return jwt.verify(token, config.jwtSecret) as T;
+    return jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] }) as T;
   } catch {
     return null;
   }

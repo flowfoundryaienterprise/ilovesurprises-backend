@@ -5,7 +5,10 @@ node_modules/
 dist/
 
 # Environment variables
-.env.local
+.env
+.env.*
+!.env.example
+coverage/
 
 # Logs
 npm-debug.log*
