@@ -46,3 +46,7 @@ Keep the external environment and upload data regardless of code version. Never 
 - npm run build: failed because tsc is not installed.
 - npm test: failed because vitest is not installed. No test pass count is claimed.
 - Node syntax checks on the edited auth/payment/upload sources and git diff --check passed before final review. Syntax checks do not typecheck, run Prisma or exercise financial concurrency.
+
+## Subsequent GitHub CI verification
+
+Run https://github.com/flowfoundryaienterprise/ilovesurprises-backend/actions/runs/38784711578 verified commit 6140f3b through the PR merge ref. npm ci, npx prisma generate, npm run build and npm test all passed. Four test files and 24 tests passed (13 security, 5 payment integrity, 3 utilities, 3 payment smoke). This supersedes the local execution blockage for those checks only; no real PostgreSQL concurrency or legacy integration tests ran. Installation reported 3 high-severity dependency advisories requiring triage. No deployment job exists in this workflow.

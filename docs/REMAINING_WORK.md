@@ -1,12 +1,14 @@
 # Remaining work and release blockers
 
-This is an incomplete emergency repair, not completion of Phases 0–7. Dependency installation was blocked, so all new behavior requires typechecking and executed tests before merge/deployment.
+This is an incomplete emergency repair, not completion of Phases 0–7. Local dependency installation was blocked. GitHub CI subsequently passed install, Prisma generation, TypeScript build and 24 isolated tests on commit 6140f3b. Database concurrency and the full legacy integration suite remain unverified.
 
 ## Security follow-up
 
+- CI npm ci reported 3 high-severity dependency advisories. Obtain the detailed audit report, assess runtime exposure, update the lockfile safely and rerun tests before release.
+
 - Operator credential rotation, local/VPS ACL verification and coordinated history cleanup remain outstanding.
 - Uploads now accept only non-interlaced 8-bit PNG (grayscale/RGB with optional alpha), 5 MB/4 million pixels; indexed PNG, JPEG, GIF, WebP and SVG uploads are rejected. Replace the deliberately restricted parser with a maintained, bounded decoding/re-encoding library when dependencies are available, with format-specific tests. Existing files require operator inspection.
-- Google adversarial tests were authored but not executed. Add access-token audience/expiry/userinfo identity tests and production startup/CORS tests. Email/password integration needs revalidation.
+- The new Google adversarial tests passed in CI. Add access-token audience/expiry/userinfo identity tests and production startup/CORS tests. Email/password integration needs revalidation.
 - Add distributed authentication and checkout rate limits, reset-token single-use storage and real password-reset delivery. Review all fallback error paths and public product-review authentication.
 
 ## Payment/inventory — blocking rollout
