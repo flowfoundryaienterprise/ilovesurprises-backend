@@ -54,7 +54,7 @@ const resolveCouponDiscount = async (code: string, subtotalCents: number) => {
     (coupon.maxUses !== null && coupon.currentUses >= coupon.maxUses) ||
     (coupon.minOrderAmount && subtotalCents < toCents(coupon.minOrderAmount))
   ) {
-    throw new PaymentError(`Promo code "${code}" is not valid for this order.`);
+    throw new PaymentError(`Promo code '${code}' is not valid for this order.`);
   }
 
   let discountCents = /percent/i.test(coupon.discountType)
@@ -71,7 +71,24 @@ const generateOrderNumber = () =>
  * Creates a PENDING order priced from the database. For card payments it also
  * opens a Stripe Checkout session and returns its URL.
  */
-export const createCheckout = async (userId: string, input: CreateCheckoutDTO) => {
+/** Storefront origins Stripe may send customers back to. */
+const ALLOWED_RETURN_ORIGINS = [
+  'https://ilovesurprises.com',
+  'https://www.ilovesurprises.com',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:5173',
+];
+
+// The customer returns to the site they checked out from, but only if it is on
+// the allowlist; anything else falls back to FRONTEND_URL.
+const resolveReturnBaseUrl = (requestOrigin?: string): string => {
+  const origin = requestOrigin?.replace(/\/+$/, '');
+  return origin && ALLOWED_RETURN_ORIGINS.includes(origin) ? origin : config.frontendUrl;
+};
+
+export const createCheckout = async (userId: string, input: CreateCheckoutDTO, requestOrigin?: string) => {
+  const returnBaseUrl = resolveReturnBaseUrl(requestOrigin);
   if (input.paymentMethod === 'paypal') {
     throw new PaymentError('PayPal is not available yet. Please pay by card, Apple Pay or Google Pay.');
   }
@@ -88,7 +105,7 @@ export const createCheckout = async (userId: string, input: CreateCheckoutDTO) =
       throw new PaymentError('An item in your bag is no longer available. Please remove it and try again.');
     }
     if (product.stock < item.quantity) {
-      throw new PaymentError(`"${product.name}" only has ${product.stock} left in stock.`);
+      throw new PaymentError(`'${product.name}' only has ${product.stock} left in stock.`);
     }
     const unitCents = toCents(product.price);
     return { item, product, unitCents, lineCents: unitCents * item.quantity };
@@ -223,8 +240,8 @@ export const createCheckout = async (userId: string, input: CreateCheckoutDTO) =
       ...(stripeCouponId ? { discounts: [{ coupon: stripeCouponId }] } : {}),
       metadata: { orderId: order.id, orderNumber: order.orderNumber },
       payment_intent_data: { metadata: { orderId: order.id, orderNumber: order.orderNumber } },
-      success_url: `${config.frontendUrl}/order-confirmation?order_id=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.frontendUrl}/payment?payment_status=cancelled&order_id=${order.id}`,
+      success_url: `${returnBaseUrl}/order-confirmation?order_id=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${returnBaseUrl}/payment?payment_status=cancelled&order_id=${order.id}`,
     },
     { idempotencyKey: `checkout-${order.id}` }
   );

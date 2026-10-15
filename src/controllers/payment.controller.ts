@@ -12,7 +12,7 @@ const sendPaymentError = (error: unknown, res: Response, next: NextFunction) => 
 
 export const createCheckout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const result = await paymentService.createCheckout(req.user!.id, req.body);
+    const result = await paymentService.createCheckout(req.user!.id, req.body, req.get('origin'));
     res.status(201).json({ status: 'success', data: result });
   } catch (error) {
     sendPaymentError(error, res, next);
