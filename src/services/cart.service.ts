@@ -102,7 +102,7 @@ export const getCart = async (userId?: string, guestCartId?: string): Promise<Ca
 
       return calculateCartSummary(dbCart.id, userId, items);
     } catch (err: any) {
-      console.warn('DB cart query failed, falling back to session cart:', err.message);
+      console.warn('DB cart query failed, falling back to session cart:');
     }
   }
 
@@ -170,7 +170,7 @@ export const addToCart = async (
 
       return getCart(userId);
     } catch (err: any) {
-      console.warn('DB addToCart failed, using guest storage fallback:', err.message);
+      console.warn('DB addToCart failed, using guest storage fallback:');
     }
   }
 
@@ -238,7 +238,7 @@ export const updateCartItem = async (
       }
       return getCart(userId);
     } catch (err: any) {
-      console.warn('DB updateCartItem failed, falling back to guest cart:', err.message);
+      console.warn('DB updateCartItem failed, falling back to guest cart:');
     }
   }
 
@@ -277,7 +277,7 @@ export const removeCartItem = async (
       await prisma.cart_items.delete({ where: { id: itemId } });
       return getCart(userId);
     } catch (err: any) {
-      console.warn('DB removeCartItem failed, trying memory:', err.message);
+      console.warn('DB removeCartItem failed, trying memory:');
     }
   }
 
@@ -296,7 +296,7 @@ export const clearCart = async (userId?: string, guestCartId?: string): Promise<
       }
       return getCart(userId);
     } catch (err: any) {
-      console.warn('DB clearCart failed, using guest clear:', err.message);
+      console.warn('DB clearCart failed, using guest clear:');
     }
   }
 

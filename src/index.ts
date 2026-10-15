@@ -12,10 +12,10 @@ async function warmupServer(): Promise<void> {
     console.log('✅ Database connection pool warmed up.');
     // Pre-warm all key collections and categories into memory
     warmupProductCatalog().catch((err) => {
-      console.warn('⚠️ Product catalog pre-warm notice:', err?.message);
+      console.warn('⚠️ Product catalog pre-warm notice:');
     });
   } catch (err) {
-    console.warn('⚠️  DB warmup failed (non-fatal):', err);
+    console.warn('⚠️  DB warmup failed (non-fatal):');
   }
 }
 

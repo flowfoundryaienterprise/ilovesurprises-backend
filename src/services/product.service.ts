@@ -17,8 +17,8 @@ interface CacheEntry<T> {
 
 const productListCache = new Map<string, CacheEntry<any>>();
 const productDetailCache = new Map<string, CacheEntry<ProductResponseDTO>>();
-const LIST_CACHE_TTL_MS = 60 * 60 * 1000;   // 1 hour
-const DETAIL_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const LIST_CACHE_TTL_MS = 0;   // 1 hour
+const DETAIL_CACHE_TTL_MS = 0; // 1 hour
 
 function getCached<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
   const entry = cache.get(key);
@@ -76,7 +76,7 @@ export async function warmupProductCatalog(): Promise<void> {
     }
     console.log(`✅ Pre-warmed ${warmupQueries.length} collections and category queries in memory.`);
   } catch (err: any) {
-    console.warn('Warmup encountered partial error (non-fatal):', err?.message);
+    console.warn('Warmup encountered partial error (non-fatal):');
   }
 
   // Refresh every 30 minutes in background so cache never expires
@@ -546,7 +546,7 @@ export const listProducts = async (query: ListProductsQueryDTO): Promise<{
       return result;
     }
   } catch (err: any) {
-    console.warn('DB query in listProducts fell back to default catalog:', err.message);
+    console.warn('DB query in listProducts fell back to default catalog:');
   }
 
   let filtered = [...DEFAULT_CATALOG];
@@ -619,7 +619,7 @@ export const getProductByIdOrSlug = async (identifier: string): Promise<ProductR
       return formatted;
     }
   } catch (err: any) {
-    console.warn('DB query in getProductByIdOrSlug failed, checking catalog:', err.message);
+    console.warn('DB query in getProductByIdOrSlug failed, checking catalog:');
   }
 
   const matched = DEFAULT_CATALOG.find(
@@ -704,7 +704,7 @@ export const getProductsBatch = async (ids: string[]): Promise<ProductResponseDT
       }
     }
   } catch (err: any) {
-    console.warn('DB batch query failed, checking catalog:', err.message);
+    console.warn('DB batch query failed, checking catalog:');
     for (const id of missingIds) {
       const matched = DEFAULT_CATALOG.find(
         (p) => p.id === id || p.slug.toLowerCase() === id.toLowerCase()

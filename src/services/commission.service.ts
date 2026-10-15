@@ -104,6 +104,7 @@ export async function resolveGenealogyPayoutChain(
   // Selling reps cannot earn personal 20% Level 0 commission on their own purchases.
   const isSelfPurchase = sellingRep.userId === customerId;
 
+  if (isSelfPurchase) return [];
   if (!isSelfPurchase) {
     if (sellingRep.isActive && sellingRep.payoutStatus !== 'suspended') {
       payoutChain.push({
@@ -140,7 +141,7 @@ export async function resolveGenealogyPayoutChain(
     visited.add(sponsor.id);
 
     // Active status & payout eligibility check
-    if (sponsor.isActive && sponsor.payoutStatus !== 'suspended') {
+    if (sponsor.userId !== customerId && sponsor.isActive && sponsor.payoutStatus !== 'suspended') {
       payoutChain.push({
         level,
         affiliateId: sponsor.id,
@@ -175,6 +176,10 @@ export async function processOrderCommission(
 
     if (!order) {
       throw new Error(`Order ${orderId} not found`);
+    }
+
+    if (order.paymentStatus !== 'PAID' || ['CANCELLED', 'REFUNDED'].includes(order.status)) {
+      throw Object.assign(new Error('Commissions require a paid, eligible order'), { statusCode: 409 });
     }
 
     // 2. Attribution Check
