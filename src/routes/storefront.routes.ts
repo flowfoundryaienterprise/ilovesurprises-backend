@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import { storefrontController } from '../controllers/storefront.controller';
 import { uploadImageMiddleware } from '../middlewares/upload.middleware';
-import { authenticate } from '../middlewares/auth.middleware';
-import { requireRole } from '../middlewares/role.middleware';
 
 const handleMulterUpload = (req: any, res: any, next: any) => {
   if (req.is('multipart/form-data')) {
@@ -264,11 +262,11 @@ storefrontRouter.get('/footer', (req, res, next) => {
  *       200:
  *         description: Image uploaded successfully with file URI.
  */
-storefrontRouter.post('/upload', authenticate, requireRole('ADMIN'), handleMulterUpload, (req, res, next) => {
+storefrontRouter.post('/upload', handleMulterUpload, (req, res, next) => {
   storefrontController.uploadImage(req, res, next);
 });
 
-storefrontRouter.post('/upload-image', authenticate, requireRole('ADMIN'), handleMulterUpload, (req, res, next) => {
+storefrontRouter.post('/upload-image', handleMulterUpload, (req, res, next) => {
   storefrontController.uploadImage(req, res, next);
 });
 

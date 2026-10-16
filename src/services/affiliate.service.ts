@@ -110,7 +110,7 @@ export async function resolveAffiliateByUsername(
       },
     });
   } catch (err) {
-    console.warn('Failed to record referral visit:');
+    console.warn('Failed to record referral visit:', err);
   }
 
   return formatAffiliateProfile(affiliate);

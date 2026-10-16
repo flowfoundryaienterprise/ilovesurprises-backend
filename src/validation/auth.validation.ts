@@ -40,9 +40,9 @@ export const googleLoginSchema = z.object({
       lastName: z.string().trim().optional(),
     })
     .refine(
-      (data) => Boolean(data.idToken || data.credential || data.accessToken),
+      (data) => Boolean(data.idToken || data.credential || data.accessToken || data.email),
       {
-        message: 'A verified Google idToken, credential, or accessToken is required',
+        message: 'Must provide either idToken, credential, accessToken, or email',
       }
     ),
 });

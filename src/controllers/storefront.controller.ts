@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as storefrontService from '../services/storefront.service';
-import { saveBase64Image, saveImage } from '../middlewares/upload.middleware';
+import { saveBase64Image } from '../middlewares/upload.middleware';
 
 // ─── PUBLIC STOREFRONT CONTROLLERS ───────────────────────────────────────────
 
@@ -514,7 +514,7 @@ export const uploadImage = async (
   try {
     // 1. Multipart uploaded file via Multer
     if (req.file) {
-      const relativeUrl = await saveImage(req.file.buffer);
+      const relativeUrl = `/uploads/${req.file.filename}`;
       const protocol = req.protocol;
       const host = req.get('host');
       const absoluteUrl = `${protocol}://${host}${relativeUrl}`;
@@ -525,7 +525,7 @@ export const uploadImage = async (
         data: {
           url: relativeUrl,
           absoluteUrl,
-          filename: relativeUrl.split('/').pop(),
+          filename: req.file.filename,
           size: req.file.size,
           mimetype: req.file.mimetype,
         },
