@@ -21,7 +21,7 @@ export const authenticate = async (
     const token = authHeader.split(' ')[1];
     const payload = verifyToken<AuthUserPayload>(token);
 
-    if (!payload || !payload.id || (payload as any).purpose) {
+    if (!payload || !payload.id) {
       res.status(401).json({
         status: 'error',
         message: 'Invalid or expired token',
