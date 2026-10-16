@@ -34,9 +34,8 @@ export const handleWebhook = async (req: Request, res: Response): Promise<void> 
     await paymentService.handleWebhook(req.body as Buffer, req.header('stripe-signature'));
     res.status(200).json({ received: true });
   } catch (error: any) {
-    console.error('[payments] Webhook rejected:');
-    const status = error?.type === 'StripeSignatureVerificationError' ? 400 : error instanceof PaymentError ? error.statusCode : 500;
-    res.status(status).json({ status: 'error', message: status >= 500 ? 'Webhook processing failed; retry required' : 'Webhook rejected' });
+    console.error('[payments] Webhook rejected:', error?.message);
+    res.status(400).json({ status: 'error', message: 'Webhook verification failed' });
   }
 };
 

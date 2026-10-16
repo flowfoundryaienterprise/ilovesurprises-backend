@@ -525,7 +525,7 @@ const persistAllToDb = async (): Promise<void> => {
       },
     });
   } catch (err: any) {
-    console.warn('Failed persisting storefront to database:');
+    console.warn('Failed persisting storefront to database:', err?.message);
   }
 };
 
@@ -721,10 +721,10 @@ const ensureInitialized = async (): Promise<void> => {
         };
       }
     } else {
-      persistAllToDb().catch((err) => console.warn('Could not sync storefront defaults to DB:'));
+      persistAllToDb().catch((err) => console.warn('Could not sync storefront defaults to DB:', err?.message));
     }
   } catch (err: any) {
-    console.warn('Storefront DB load notice (serving in-memory defaults):');
+    console.warn('Storefront DB load notice (serving in-memory defaults):', err?.message);
   }
 
   isInitialized = true;
@@ -922,7 +922,7 @@ export const updateFullStorefrontConfig = async (
   }
 
   // Persist to database asynchronously
-  persistAllToDb().catch((err) => console.warn('Storefront DB sync failed on bulk update:'));
+  persistAllToDb().catch((err) => console.warn('Storefront DB sync failed on bulk update:', err?.message));
 
   return getStorefrontConfig(false);
 };
@@ -990,7 +990,7 @@ export const updateHeroContent = async (data: UpdateHeroDTO): Promise<HeroConten
       },
     });
   } catch (err: any) {
-    console.warn('Failed saving hero to DB:');
+    console.warn('Failed saving hero to DB:', err?.message);
   }
 
   return heroCache;
@@ -1045,7 +1045,7 @@ export const createBenefitTile = async (data: CreateHeroBenefitTileDTO): Promise
       },
     });
   } catch (err: any) {
-    console.warn('Failed creating benefit tile in DB:');
+    console.warn('Failed creating benefit tile in DB:', err?.message);
   }
 
   return newTile;
@@ -1102,7 +1102,7 @@ export const updateBenefitTile = async (
       },
     });
   } catch (err: any) {
-    console.warn('Failed updating benefit tile in DB:');
+    console.warn('Failed updating benefit tile in DB:', err?.message);
   }
 
   return updated;
@@ -1124,7 +1124,7 @@ export const deleteBenefitTile = async (id: string): Promise<{ success: boolean;
       where: { id },
     });
   } catch (err: any) {
-    console.warn('Failed deleting benefit tile from DB:');
+    console.warn('Failed deleting benefit tile from DB:', err?.message);
   }
 
   return { success: true, message: `Benefit tile "${id}" deleted successfully` };
@@ -1220,7 +1220,7 @@ export const createShowcaseCard = async (data: CreateShowcaseCardDTO): Promise<S
       },
     });
   } catch (err: any) {
-    console.warn('Failed creating showcase card in DB:');
+    console.warn('Failed creating showcase card in DB:', err?.message);
   }
 
   return newCard;
@@ -1312,7 +1312,7 @@ export const updateShowcaseCard = async (
       },
     });
   } catch (err: any) {
-    console.warn('Failed saving updated showcase card to DB:');
+    console.warn('Failed saving updated showcase card to DB:', err?.message);
   }
 
   return updated;
@@ -1342,7 +1342,7 @@ export const deleteShowcaseCard = async (cardKey: string): Promise<{ success: bo
       },
     });
   } catch (err: any) {
-    console.warn('Failed deleting showcase card from DB:');
+    console.warn('Failed deleting showcase card from DB:', err?.message);
   }
 
   return { success: true, message: `Showcase card "${cardKey}" deleted successfully` };
@@ -1397,7 +1397,7 @@ export const updateBanners = async (data: UpdateStorefrontBannersDTO): Promise<S
       },
     });
   } catch (err: any) {
-    console.warn('Failed saving top sticky banner to DB:');
+    console.warn('Failed saving top sticky banner to DB:', err?.message);
   }
 
   if (data.promotionalDiscountAlertBar) {
@@ -1439,7 +1439,7 @@ export const updateBanners = async (data: UpdateStorefrontBannersDTO): Promise<S
       },
     });
   } catch (err: any) {
-    console.warn('Failed saving promo alert bar to DB:');
+    console.warn('Failed saving promo alert bar to DB:', err?.message);
   }
 
   return bannersCache;
@@ -1494,7 +1494,7 @@ export const updateValueProposition = async (
       },
     });
   } catch (err: any) {
-    console.warn('Failed saving value proposition to DB:');
+    console.warn('Failed saving value proposition to DB:', err?.message);
   }
 
   return valuePropositionCache;
@@ -1555,7 +1555,7 @@ export const updateAboutContent = async (
       },
     });
   } catch (err: any) {
-    console.warn('Failed saving about content to DB:');
+    console.warn('Failed saving about content to DB:', err?.message);
   }
 
   return aboutContentCache;
@@ -1617,7 +1617,7 @@ export const createFaq = async (data: CreateFaqItemDTO): Promise<FaqContentItemD
       },
     });
   } catch (err: any) {
-    console.warn('Failed creating FAQ in DB:');
+    console.warn('Failed creating FAQ in DB:', err?.message);
   }
 
   return newFaq;
@@ -1672,7 +1672,7 @@ export const updateFaq = async (
       },
     });
   } catch (err: any) {
-    console.warn('Failed updating FAQ in DB:');
+    console.warn('Failed updating FAQ in DB:', err?.message);
   }
 
   return updated;
@@ -1694,7 +1694,7 @@ export const deleteFaq = async (id: string): Promise<{ success: boolean; message
       where: { id },
     });
   } catch (err: any) {
-    console.warn('Failed deleting FAQ from DB:');
+    console.warn('Failed deleting FAQ from DB:', err?.message);
   }
 
   return { success: true, message: `FAQ item "${id}" deleted successfully` };
@@ -1755,7 +1755,7 @@ export const updateFooterContent = async (
       },
     });
   } catch (err: any) {
-    console.warn('Failed saving footer to DB:');
+    console.warn('Failed saving footer to DB:', err?.message);
   }
 
   return footerCache;

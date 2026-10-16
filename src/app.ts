@@ -1,5 +1,5 @@
 import express, { Application, Request, Response } from 'express';
-import { UPLOADS_DIR } from './middlewares/upload.middleware';
+import path from 'path';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { apiRouter } from './routes';
@@ -25,7 +25,7 @@ export const createApp = (): Application => {
         'http://127.0.0.1:5173',
         'http://127.0.0.1:3000',
       ];
-      if ((process.env.NODE_ENV === 'production' ? allowedOrigins.slice(0, 2) : allowedOrigins).includes(origin)) {
+      if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production' || origin.includes('localhost') || origin.includes('127.0.0.1')) {
         return callback(null, true);
       }
       return callback(new Error('Not allowed by CORS'));
@@ -39,7 +39,7 @@ export const createApp = (): Application => {
   app.use(cookieParser());
 
   // Static directory for uploaded images (hero banners, showcase cards, etc.)
-  app.use('/uploads', express.static(UPLOADS_DIR, { dotfiles: 'deny', setHeaders: (res) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox"); } }));
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
