@@ -149,6 +149,8 @@ export const deleteProduct = async (
   }
 };
 
+import * as orderController from './order.controller';
+
 // Backward compatibility object export
 export const adminController = {
   listUsers,
@@ -176,4 +178,11 @@ export const adminController = {
   createProduct,
   updateProduct,
   deleteProduct,
+  listOrders: orderController.listOrders,
+  getOrderById: orderController.getOrderById,
+  updateOrderStatus: orderController.updateOrderStatus,
+  createOrUpdateFulfillment: orderController.createOrUpdateFulfillment,
+  addOrderNote: orderController.addOrderNote,
+  processOrderRefund: orderController.processOrderRefund,
 };
+

@@ -61,9 +61,11 @@ export const createApp = (): Application => {
           affiliates: '/api/affiliates',
           commission: '/api/commission',
           payments: '/api/payments',
+          orders: '/api/orders',
         },
       },
     });
+
   });
 
   app.use('/health', healthRouter);

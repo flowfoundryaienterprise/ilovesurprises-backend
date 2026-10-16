@@ -46,10 +46,19 @@ import {
   adminCommissionLedgerSchema,
   exportCsvSchema,
 } from '../validation/analytics.validation';
+import {
+  listOrdersSchema,
+  orderIdParamSchema,
+  updateOrderStatusSchema,
+  createFulfillmentSchema,
+  createOrderNoteSchema,
+  processOrderRefundSchema,
+} from '../validation/order.validation';
 import { analyticsController } from '../controllers/analytics.controller';
 import { UserRole } from '@prisma/client';
 
 export const adminRouter = Router();
+
 
 // Protect all admin routes with authentication and ADMIN role check
 adminRouter.use(authenticate, requireRole(UserRole.ADMIN));
@@ -548,4 +557,252 @@ adminRouter.get(
   validateRequest(adminCommissionLedgerSchema),
   analyticsController.getAdminCommissionLedger
 );
+
+// --- Orders & Fulfillment Management Endpoints (Admin only) ---
+
+/**
+ * @openapi
+ * /api/admin/orders:
+ *   get:
+ *     summary: List and search all store orders with filters
+ *     description: Retrieve paginated customer orders with multi-parameter filtering (order #, customer name/email, status, paymentStatus, and date range). Matches "Orders & Fulfillment" registry view.
+ *     tags:
+ *       - Admin Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by order number, customer name, email, or item name
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by fulfillment/order status (all, processing, shipped, delivered, cancelled)
+ *       - in: query
+ *         name: paymentStatus
+ *         schema:
+ *           type: string
+ *         description: Filter by payment status (all, paid, refunded, pending)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Paginated orders matching search/filters.
+ *       401:
+ *         description: Unauthorized.
+ *       403:
+ *         description: Forbidden - Admin role required.
+ */
+adminRouter.get('/orders', validateRequest(listOrdersSchema), (req, res, next) => {
+  adminController.listOrders(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/admin/orders/{id}:
+ *   get:
+ *     summary: Get complete order details
+ *     description: Returns complete order manifest, customer contact, delivery snapshots, items breakdown, fulfillments, notes, and refund records.
+ *     tags:
+ *       - Admin Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order ID or Order Number (#ILS-...)
+ *     responses:
+ *       200:
+ *         description: Detailed order record.
+ *       404:
+ *         description: Order not found.
+ */
+adminRouter.get('/orders/:id', validateRequest(orderIdParamSchema), (req, res, next) => {
+  adminController.getOrderById(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/admin/orders/{id}/status:
+ *   patch:
+ *     summary: Update order status
+ *     tags:
+ *       - Admin Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Order status updated.
+ */
+adminRouter.patch('/orders/:id/status', validateRequest(updateOrderStatusSchema), (req, res, next) => {
+  adminController.updateOrderStatus(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/admin/orders/{id}/fulfillment:
+ *   post:
+ *     summary: Update shipping carrier, tracking number, and mark as Shipped/Delivered
+ *     description: Matches "Fulfillment & Tracking Controls" in AdminOrders modal. Records carrier (USPS, UPS, FedEx, DHL), tracking number, and tracking URL, updating order fulfillment status.
+ *     tags:
+ *       - Admin Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - carrier
+ *             properties:
+ *               carrier:
+ *                 type: string
+ *                 example: USPS
+ *               trackingNumber:
+ *                 type: string
+ *                 example: 940011189922315582
+ *               trackingUrl:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 enum: [UNFULFILLED, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Fulfillment and tracking updated successfully.
+ */
+adminRouter.post(
+  '/orders/:id/fulfillment',
+  validateRequest(createFulfillmentSchema),
+  (req, res, next) => {
+    adminController.createOrUpdateFulfillment(req, res, next);
+  }
+);
+
+/**
+ * @openapi
+ * /api/admin/orders/{id}/notes:
+ *   post:
+ *     summary: Add an internal or customer-visible order note
+ *     tags:
+ *       - Admin Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - note
+ *             properties:
+ *               note:
+ *                 type: string
+ *               isCustomerVisible:
+ *                 type: boolean
+ *                 default: false
+ *     responses:
+ *       201:
+ *         description: Note recorded successfully.
+ */
+adminRouter.post('/orders/:id/notes', validateRequest(createOrderNoteSchema), (req, res, next) => {
+  adminController.addOrderNote(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/admin/orders/{id}/refund:
+ *   post:
+ *     summary: Issue full or partial order refund
+ *     description: Matches "Process Order Refund" drawer in AdminOrders. Records refund record, updates payment status, restocks inventory (if requested), and handles commission reversals.
+ *     tags:
+ *       - Admin Orders
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 example: 49.99
+ *               reason:
+ *                 type: string
+ *                 example: Customer return requested
+ *               restockInventory:
+ *                 type: boolean
+ *                 default: true
+ *     responses:
+ *       200:
+ *         description: Refund processed and recorded successfully.
+ */
+adminRouter.post(
+  '/orders/:id/refund',
+  validateRequest(processOrderRefundSchema),
+  (req, res, next) => {
+    adminController.processOrderRefund(req, res, next);
+  }
+);
+
 
