@@ -55,6 +55,8 @@ import {
   processOrderRefundSchema,
 } from '../validation/order.validation';
 import { analyticsController } from '../controllers/analytics.controller';
+import { settingsController } from '../controllers/settings.controller';
+import { updateSettingsSchema } from '../validation/settings.validation';
 import { UserRole } from '@prisma/client';
 
 export const adminRouter = Router();
@@ -804,5 +806,163 @@ adminRouter.post(
     adminController.processOrderRefund(req, res, next);
   }
 );
+
+// --- System Configuration & Store Settings Endpoints (Admin Settings Suite) ---
+
+/**
+ * @openapi
+ * /api/admin/settings:
+ *   get:
+ *     summary: Get complete system settings and store configuration
+ *     description: Retrieve all system configuration and rules matching Admin Settings dashboard, including referral attribution cookie window, restricted rep usernames, onboarding starter kits, payment gateways & webhooks, transactional email relay, and top banner & site announcement copy.
+ *     tags:
+ *       - Admin Settings
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Full system configuration and rules.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     settings:
+ *                       $ref: '#/components/schemas/SystemSettings'
+ *       401:
+ *         description: Unauthorized.
+ *       403:
+ *         description: Forbidden - Admin role required.
+ */
+adminRouter.get('/settings', (req, res, next) => {
+  settingsController.getSettings(req, res, next);
+});
+
+adminRouter.get('/store-settings', (req, res, next) => {
+  settingsController.getSettings(req, res, next);
+});
+
+adminRouter.get('/system-settings', (req, res, next) => {
+  settingsController.getSettings(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/admin/settings:
+ *   put:
+ *     summary: Update complete system configuration and rules
+ *     description: Matches the "SAVE CHANGES" button on Admin Settings. Updates attribution cookie windows, reserved handles, starter bundles, email providers, payment gateways, and announcement copy.
+ *     tags:
+ *       - Admin Settings
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateSystemSettings'
+ *     responses:
+ *       200:
+ *         description: System settings updated successfully.
+ *       400:
+ *         description: Validation error.
+ *       401:
+ *         description: Unauthorized.
+ *       403:
+ *         description: Forbidden - Admin role required.
+ */
+adminRouter.put('/settings', validateRequest(updateSettingsSchema), (req, res, next) => {
+  settingsController.updateSettings(req, res, next);
+});
+
+adminRouter.put('/store-settings', validateRequest(updateSettingsSchema), (req, res, next) => {
+  settingsController.updateSettings(req, res, next);
+});
+
+adminRouter.put('/system-settings', validateRequest(updateSettingsSchema), (req, res, next) => {
+  settingsController.updateSettings(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/admin/settings:
+ *   patch:
+ *     summary: Partially update system configuration and rules
+ *     tags:
+ *       - Admin Settings
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateSystemSettings'
+ *     responses:
+ *       200:
+ *         description: System settings updated successfully.
+ */
+adminRouter.patch('/settings', validateRequest(updateSettingsSchema), (req, res, next) => {
+  settingsController.updateSettings(req, res, next);
+});
+
+adminRouter.patch('/store-settings', validateRequest(updateSettingsSchema), (req, res, next) => {
+  settingsController.updateSettings(req, res, next);
+});
+
+adminRouter.patch('/system-settings', validateRequest(updateSettingsSchema), (req, res, next) => {
+  settingsController.updateSettings(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/admin/settings/reset:
+ *   post:
+ *     summary: Reset system settings to platform defaults
+ *     description: Restores default system configuration matching platform initial values.
+ *     tags:
+ *       - Admin Settings
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: System settings reset to defaults.
+ */
+adminRouter.post('/settings/reset', (req, res, next) => {
+  settingsController.resetSettings(req, res, next);
+});
+
+adminRouter.post('/store-settings/reset', (req, res, next) => {
+  settingsController.resetSettings(req, res, next);
+});
+
+adminRouter.post('/system-settings/reset', (req, res, next) => {
+  settingsController.resetSettings(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/admin/settings/starter-kits:
+ *   get:
+ *     summary: Get representative onboarding starter kits
+ *     tags:
+ *       - Admin Settings
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of onboarding starter kits.
+ */
+adminRouter.get('/settings/starter-kits', (req, res, next) => {
+  settingsController.getStarterKits(req, res, next);
+});
+
 
 

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as affiliateService from '../services/affiliate.service';
+import { getReferralAttributionDays } from '../services/settings.service';
 
 export const resolveAffiliate = async (
   req: Request,
@@ -28,10 +29,11 @@ export const resolveAffiliate = async (
       return;
     }
 
-    // Set signed/secure HTTP-only tracking cookie for 30 days
+    // Set signed/secure HTTP-only tracking cookie using configured referral attribution duration
     const isProduction = process.env.NODE_ENV === 'production';
+    const attributionDays = getReferralAttributionDays();
     res.cookie('ils_affiliate_id', affiliate.id, {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: attributionDays * 24 * 60 * 60 * 1000,
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',

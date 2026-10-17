@@ -7,6 +7,7 @@ import {
   GenealogyTreeNode,
   RegisterAffiliateDTO,
 } from '../types/affiliate.types';
+import { isUsernameRestricted } from './settings.service';
 
 export const RESERVED_USERNAMES = new Set([
   'admin',
@@ -125,8 +126,8 @@ export async function registerAffiliate(
 ): Promise<AffiliateProfileDTO> {
   const normalizedUsername = data.username.trim().toLowerCase();
 
-  // Validate reserved routes
-  if (RESERVED_USERNAMES.has(normalizedUsername)) {
+  // Validate reserved routes and restricted rep usernames configured in system settings
+  if (RESERVED_USERNAMES.has(normalizedUsername) || isUsernameRestricted(normalizedUsername)) {
     const error: any = new Error(`Username "${normalizedUsername}" is reserved by the system`);
     error.statusCode = 400;
     throw error;

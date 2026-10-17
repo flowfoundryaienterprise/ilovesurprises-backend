@@ -207,6 +207,117 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        StarterKit: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'pro-ambassador' },
+            name: { type: 'string', example: 'Pro Ambassador Starter Kit' },
+            price: { type: 'number', example: 99.0 },
+            currency: { type: 'string', example: 'USD' },
+            description: {
+              type: 'string',
+              example: 'Contains 4 Best-Selling Cash Candles, 2 Bath Bombs, 2 Wax Melts, Scent Sampler Strips, and 100 Catalogs.',
+            },
+            includes: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Cash Candles (2x)', 'Diamond Ring Candles (2x)', 'Aroma Samplers (50x)', 'Branded Swag Bag'],
+            },
+            isActive: { type: 'boolean', example: true },
+          },
+        },
+        PaymentGateway: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'stripe' },
+            name: { type: 'string', example: 'Stripe Credit / Debit Engine' },
+            status: { type: 'string', example: 'Webhook Status: Healthy (200 OK)' },
+            enabled: { type: 'boolean', example: true },
+            subtext: { type: 'string', example: 'Webhook Status: Healthy (200 OK)' },
+          },
+        },
+        EmailTemplate: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'order-confirmation' },
+            name: { type: 'string', example: 'Order Confirmation & Tracking' },
+            status: { type: 'string', example: 'Ready ✓' },
+            enabled: { type: 'boolean', example: true },
+          },
+        },
+        TransactionalEmail: {
+          type: 'object',
+          properties: {
+            activeProvider: { type: 'string', example: 'Twilio SendGrid (Standard)' },
+            senderName: { type: 'string', example: 'ILoveSurprises Customer Experience' },
+            senderEmail: { type: 'string', format: 'email', example: 'support@ilovesurprises.com' },
+            registeredTemplates: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/EmailTemplate' },
+            },
+          },
+        },
+        SiteAnnouncements: {
+          type: 'object',
+          properties: {
+            storeAnnouncementBarText: {
+              type: 'string',
+              example: '✨ FREE EXPRESS SHIPPING OVER $50 • GUARANTEED REAL SURPRISE INSIDE EVERY ORDER ✨',
+            },
+            vipRevealClubPromoCopy: {
+              type: 'string',
+              example: 'VIP Reveal Club: Save 15% with code SURPRISE15 at checkout',
+            },
+          },
+        },
+        SystemSettings: {
+          type: 'object',
+          properties: {
+            referralAttributionWindowDays: { type: 'integer', example: 60 },
+            referralAttributionWindow: { type: 'integer', example: 60 },
+            restrictedRepUsernames: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['admin', 'administrator', 'ilovesurprises', 'official', 'support', 'help', 'ceo', 'founder', 'billing', 'root', 'payouts', 'security', 'mod', 'staff'],
+            },
+            onboardingStarterKits: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/StarterKit' },
+            },
+            paymentGateways: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/PaymentGateway' },
+            },
+            transactionalEmail: { $ref: '#/components/schemas/TransactionalEmail' },
+            announcements: { $ref: '#/components/schemas/SiteAnnouncements' },
+            storeAnnouncementBarText: { type: 'string', example: '✨ FREE EXPRESS SHIPPING OVER $50 • GUARANTEED REAL SURPRISE INSIDE EVERY ORDER ✨' },
+            vipRevealClubPromoCopy: { type: 'string', example: 'VIP Reveal Club: Save 15% with code SURPRISE15 at checkout' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        UpdateSystemSettings: {
+          type: 'object',
+          properties: {
+            referralAttributionWindowDays: { type: 'integer', example: 60 },
+            restrictedRepUsernames: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['admin', 'administrator', 'billing'],
+            },
+            onboardingStarterKits: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/StarterKit' },
+            },
+            paymentGateways: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/PaymentGateway' },
+            },
+            transactionalEmail: { $ref: '#/components/schemas/TransactionalEmail' },
+            announcements: { $ref: '#/components/schemas/SiteAnnouncements' },
+            storeAnnouncementBarText: { type: 'string' },
+            vipRevealClubPromoCopy: { type: 'string' },
+          },
+        },
       },
     },
   },

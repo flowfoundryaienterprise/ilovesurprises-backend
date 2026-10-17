@@ -10,6 +10,7 @@ import { affiliateRouter } from './affiliate.routes';
 import { commissionRouter } from './commission.routes';
 import { paymentRouter } from './payment.routes';
 import { orderRouter } from './order.routes';
+import { settingsRouter } from './settings.routes';
 
 import { storefrontController } from '../controllers/storefront.controller';
 import { uploadImageMiddleware } from '../middlewares/upload.middleware';
@@ -41,6 +42,8 @@ apiRouter.use('/affiliates', affiliateRouter);
 apiRouter.use('/commission', commissionRouter);
 apiRouter.use('/payments', paymentRouter);
 apiRouter.use('/orders', orderRouter);
+apiRouter.use('/settings', settingsRouter);
+apiRouter.use('/store-settings', settingsRouter);
 apiRouter.post('/upload', handleMulterUpload, storefrontController.uploadImage);
 
 export {
@@ -55,6 +58,7 @@ export {
   commissionRouter,
   paymentRouter,
   orderRouter,
+  settingsRouter,
 };
 
 

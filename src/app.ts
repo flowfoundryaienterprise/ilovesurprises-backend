@@ -62,6 +62,7 @@ export const createApp = (): Application => {
           commission: '/api/commission',
           payments: '/api/payments',
           orders: '/api/orders',
+          settings: '/api/admin/settings',
         },
       },
     });
