@@ -1118,13 +1118,13 @@ adminRouter.post('/appraisals/reset', (req, res, next) => {
 });
 
 // Customer submissions management
-adminRouter.get('/appraisals/submissions', (req, res, next) => {
+adminRouter.get('/appraisals/submissions', validateRequest(listAppraisalsQuerySchema), (req, res, next) => {
   req.query.tab = 'submissions';
   appraisalController.listAdminAppraisals(req, res, next);
 });
 
 adminRouter.get('/appraisals/submissions/:id', (req, res, next) => {
-  appraisalController.getAppraisalById(req, res, next);
+  appraisalController.getSubmissionById(req, res, next);
 });
 
 adminRouter.patch('/appraisals/submissions/:id', validateRequest(updateCustomerSubmissionSchema), (req, res, next) => {
@@ -1133,6 +1133,11 @@ adminRouter.patch('/appraisals/submissions/:id', validateRequest(updateCustomerS
 
 adminRouter.delete('/appraisals/submissions/:id', (req, res, next) => {
   appraisalController.deleteCustomerSubmission(req, res, next);
+});
+
+adminRouter.delete('/appraisals/submissions', (req, res, next) => {
+  req.query.scope = 'submissions';
+  appraisalController.clearAppraisals(req, res, next);
 });
 
 // Single appraisal item endpoints

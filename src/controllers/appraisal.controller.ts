@@ -46,12 +46,17 @@ export const createAppraisal = async (req: Request, res: Response, next: NextFun
 export const getAppraisalById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const item = await appraisalService.getAppraisalByIdOrCode(id);
+    const { appraisal, submission, isSubmission } = await appraisalService.getAppraisalOrSubmissionById(id);
     res.status(200).json({
       status: 'success',
-      data: { appraisal: item, item },
-      appraisal: item,
-      item,
+      data: {
+        appraisal,
+        submission,
+        item: isSubmission ? submission : appraisal,
+      },
+      appraisal,
+      submission,
+      item: isSubmission ? submission : appraisal,
     });
   } catch (error) {
     next(error);
@@ -116,11 +121,33 @@ export const resetAppraisals = async (_req: Request, res: Response, next: NextFu
 export const submitCustomerAppraisal = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const submission = await appraisalService.submitCustomerAppraisal(req.body);
+    const refId = submission.referenceId || `#${submission.id}`;
     res.status(201).json({
       status: 'success',
-      message: 'Appraisal submission received successfully. Awaiting gemologist review.',
-      data: { submission },
+      message: 'Your jewelry appraisal submission was received successfully! Our gemology team has logged your photos and details for appraisal.',
+      referenceId: refId,
+      id: submission.id,
+      data: {
+        submission,
+        referenceId: refId,
+        id: submission.id,
+      },
       submission,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSubmissionById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const submission = await appraisalService.getSubmissionById(id);
+    res.status(200).json({
+      status: 'success',
+      data: { submission, item: submission },
+      submission,
+      item: submission,
     });
   } catch (error) {
     next(error);
@@ -184,6 +211,7 @@ export const appraisalController = {
   getAppraisalStats,
   createAppraisal,
   getAppraisalById,
+  getSubmissionById,
   updateAppraisal,
   deleteAppraisal,
   clearAppraisals,

@@ -67,6 +67,7 @@ export interface AppraisalLookupResponse {
 
 export interface CustomerAppraisalSubmission {
   id: string;
+  referenceId?: string;
   customerName: string;
   customerEmail: string;
   customerPhone?: string;
@@ -78,11 +79,14 @@ export interface CustomerAppraisalSubmission {
   codeInfo?: string;
   photoPreviews?: string[];
   images?: string[];
+  photos?: string[];
   status: AppraisalSubmissionStatus;
   notes?: string;
+  customerNotes?: string;
   appraiserNotes?: string;
   estimatedValue?: number;
   appraisedValue?: number;
+  submittedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,18 +176,33 @@ export interface UpdateAppraisalDTO {
 }
 
 export interface SubmitCustomerAppraisalDTO {
-  customerName: string;
-  customerEmail: string;
+  customerName?: string;
+  name?: string;
+  fullName?: string;
+  customerEmail?: string;
+  email?: string;
   customerPhone?: string;
+  phone?: string;
   orderNumber?: string;
-  productName: string;
-  jewelryType: string;
+  orderId?: string;
+  productName?: string;
+  product?: string;
+  sourceProduct?: string;
+  jewelryType?: string;
+  type?: string;
   metalType?: string;
+  material?: string;
   gemstoneType?: string;
+  stone?: string;
   codeInfo?: string;
+  appraisalCode?: string;
+  code?: string;
+  tagCode?: string;
   photoPreviews?: string[];
   images?: string[];
+  photos?: string[];
   notes?: string;
+  description?: string;
   estimatedValue?: number;
 }
 
@@ -191,6 +210,7 @@ export interface UpdateCustomerSubmissionDTO {
   status?: AppraisalSubmissionStatus;
   notes?: string;
   appraiserNotes?: string;
+  customerNotes?: string;
   estimatedValue?: number;
   appraisedValue?: number;
 }

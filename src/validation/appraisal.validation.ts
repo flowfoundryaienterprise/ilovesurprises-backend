@@ -89,19 +89,69 @@ export const updateAppraisalSchema = z.object({
 
 export const submitCustomerAppraisalSchema = z.object({
   body: z.object({
-    customerName: z.string().min(1, 'Customer name is required'),
-    customerEmail: z.string().email('Valid customer email is required'),
+    customerName: z.string().optional(),
+    name: z.string().optional(),
+    fullName: z.string().optional(),
+    customerEmail: z.string().optional(),
+    email: z.string().optional(),
     customerPhone: z.string().optional(),
+    phone: z.string().optional(),
     orderNumber: z.string().optional(),
-    productName: z.string().min(1, 'Product name is required'),
-    jewelryType: z.string().default('Ring'),
+    orderId: z.string().optional(),
+    productName: z.string().optional(),
+    product: z.string().optional(),
+    sourceProduct: z.string().optional(),
+    jewelryType: z.string().optional(),
+    type: z.string().optional(),
     metalType: z.string().optional(),
+    material: z.string().optional(),
     gemstoneType: z.string().optional(),
+    stone: z.string().optional(),
     codeInfo: z.string().optional(),
-    photoPreviews: z.array(z.string()).optional(),
-    images: z.array(z.string()).optional(),
+    appraisalCode: z.string().optional(),
+    code: z.string().optional(),
+    tagCode: z.string().optional(),
+    photoPreviews: z.union([z.array(z.string()), z.string()]).optional(),
+    images: z.union([z.array(z.string()), z.string()]).optional(),
+    photos: z.union([z.array(z.string()), z.string()]).optional(),
     notes: z.string().optional(),
-    estimatedValue: z.number().optional(),
+    description: z.string().optional(),
+    estimatedValue: z.preprocess((v) => (v !== undefined && v !== '' ? Number(v) : undefined), z.number().min(0).optional()),
+  }).transform((data) => {
+    const toArray = (val: string[] | string | undefined): string[] => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      return [val];
+    };
+
+    const combinedImages = [
+      ...toArray(data.photoPreviews),
+      ...toArray(data.images),
+      ...toArray(data.photos),
+    ].filter(Boolean);
+
+    return {
+      customerName: (data.customerName || data.name || data.fullName || '').trim(),
+      customerEmail: (data.customerEmail || data.email || '').trim(),
+      customerPhone: data.customerPhone || data.phone,
+      orderNumber: (data.orderNumber || data.orderId || '').trim() || undefined,
+      productName: (data.productName || data.product || data.sourceProduct || 'Surprise Reveal Candle').trim(),
+      jewelryType: (data.jewelryType || data.type || 'Ring').trim(),
+      metalType: data.metalType || data.material,
+      gemstoneType: data.gemstoneType || data.stone,
+      codeInfo: (data.codeInfo || data.appraisalCode || data.code || data.tagCode || '').trim() || undefined,
+      photoPreviews: combinedImages,
+      images: combinedImages,
+      photos: combinedImages,
+      notes: (data.notes || data.description || '').trim() || undefined,
+      estimatedValue: data.estimatedValue,
+    };
+  }).refine((data) => Boolean(data.customerName && data.customerName.length > 0), {
+    message: 'Customer name is required',
+    path: ['customerName'],
+  }).refine((data) => Boolean(data.customerEmail && data.customerEmail.includes('@')), {
+    message: 'Valid customer email is required',
+    path: ['customerEmail'],
   }),
 });
 
@@ -110,6 +160,7 @@ export const updateCustomerSubmissionSchema = z.object({
     status: z.enum(['pending', 'reviewed', 'approved', 'rejected', 'SUBMITTED', 'PENDING', 'REVIEWED', 'APPROVED', 'REJECTED']).optional(),
     notes: z.string().optional(),
     appraiserNotes: z.string().optional(),
+    customerNotes: z.string().optional(),
     estimatedValue: z.number().min(0).optional(),
     appraisedValue: z.number().min(0).optional(),
   }),

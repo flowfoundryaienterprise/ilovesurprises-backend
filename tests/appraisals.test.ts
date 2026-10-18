@@ -165,7 +165,53 @@ describe('Jewelry Appraisals API (Screenshots 2, 3 & 4)', () => {
       expect(res.status).toBe(201);
       expect(res.body.submission.customerName).toBe('Emily Watson');
       expect(res.body.submission.status).toBe('pending');
+      expect(res.body.referenceId).toMatch(/^#appr-sub-/);
+      expect(res.body.submission.referenceId).toMatch(/^#appr-sub-/);
       createdSubmissionId = res.body.submission.id;
+    });
+
+    it('POST /api/appraisals/submit should accept Tony Stark customer screenshot payload with field aliases and same code', async () => {
+      // Test payload directly reflecting Screenshot 2:
+      const res = await request(app)
+        .post('/api/appraisals/submit')
+        .send({
+          name: 'Tony Stark',
+          email: 'tonystark@avengers.com',
+          orderNumber: 'ILS-10492',
+          productName: 'Birthday Cake Cash Candle',
+          jewelryType: 'Ring',
+          codeInfo: 'Tag Code ILS-GOLD-550, foil pouch markings, hallmark stamps',
+          photos: ['/assets/ilovesurprises/appraisals/sterling-silver-halo-ring.jpg'],
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('success');
+      expect(res.body.referenceId).toMatch(/^#appr-sub-/);
+      expect(res.body.submission.customerName).toBe('Tony Stark');
+      expect(res.body.submission.customerEmail).toBe('tonystark@avengers.com');
+      expect(res.body.submission.orderNumber).toBe('ILS-10492');
+      expect(res.body.submission.productName).toBe('Birthday Cake Cash Candle');
+      expect(res.body.submission.jewelryType).toBe('Ring');
+      expect(res.body.submission.status).toBe('pending');
+
+      // Verify that another customer submitting the EXACT same tag code does not collide or fail
+      const res2 = await request(app)
+        .post('/api/appraisals/submit')
+        .send({
+          customerName: 'Pepper Potts',
+          customerEmail: 'pepper@avengers.com',
+          productName: 'Birthday Cake Cash Candle',
+          jewelryType: 'Ring',
+          codeInfo: 'Tag Code ILS-GOLD-550, foil pouch markings, hallmark stamps',
+        });
+
+      expect(res2.status).toBe(201);
+      expect(res2.body.submission.customerName).toBe('Pepper Potts');
+
+      // Clean up second test submission
+      await prisma.appraisal_records.deleteMany({
+        where: { id: { in: [res.body.submission.id, res2.body.submission.id] } },
+      });
     });
 
     it('GET /api/admin/appraisals/submissions should list customer submissions for gemologist review', async () => {
@@ -175,6 +221,35 @@ describe('Jewelry Appraisals API (Screenshots 2, 3 & 4)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.submissions.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('GET /api/admin/appraisals/submissions/:id should retrieve specific customer submission with or without #', async () => {
+      // Lookup without #
+      const res = await request(app)
+        .get(`/api/admin/appraisals/submissions/${createdSubmissionId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.submission.id).toBe(createdSubmissionId);
+      expect(res.body.submission.customerName).toBe('Emily Watson');
+
+      // Lookup with # (as displayed in customer UI notification)
+      const resWithHash = await request(app)
+        .get(`/api/admin/appraisals/submissions/%23${createdSubmissionId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(resWithHash.status).toBe(200);
+      expect(resWithHash.body.submission.id).toBe(createdSubmissionId);
+    });
+
+    it('GET /api/admin/appraisals?tab=submissions&search=... should filter submissions by Reference ID or customer info', async () => {
+      const res = await request(app)
+        .get(`/api/admin/appraisals?tab=submissions&search=${createdSubmissionId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.submissions.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.submissions[0].id).toBe(createdSubmissionId);
     });
 
     it('PATCH /api/admin/appraisals/submissions/:id should record gemologist review and valuation', async () => {
@@ -190,6 +265,16 @@ describe('Jewelry Appraisals API (Screenshots 2, 3 & 4)', () => {
       expect(res.status).toBe(200);
       expect(res.body.submission.status).toBe('approved');
       expect(res.body.submission.estimatedValue).toBe(450);
+      expect(res.body.submission.appraiserNotes).toBe('Verified genuine lab-grown sapphire in sterling silver setting.');
+      expect(res.body.submission.notes).toBe('Revealed a gorgeous blue sapphire pendant.');
+    });
+
+    it('GET /api/appraisals/:code should allow customer to look up status by their Reference ID (#appr-sub-...)', async () => {
+      const res = await request(app).get(`/api/appraisals/${createdSubmissionId}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.estimatedValue).toBe(450);
     });
   });
 

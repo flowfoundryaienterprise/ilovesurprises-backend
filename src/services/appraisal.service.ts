@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import crypto from 'crypto';
+import { saveBase64Image } from '../middlewares/upload.middleware';
 import {
   JewelryAppraisal,
   PublicAppraisalResult,
@@ -251,24 +252,36 @@ export function formatCustomerSubmission(record: any): CustomerAppraisalSubmissi
       ? 'rejected'
       : 'pending';
 
+  const images = record.images && Array.isArray(record.images) && record.images.length > 0 ? record.images : [];
+  const customerNotes = meta.customerNotes || meta.notes || notesText || record.description || undefined;
+  const appraiserNotes = meta.appraiserNotes || (notesText !== customerNotes ? notesText : undefined) || undefined;
+  
+  // Only surface codeInfo if it was provided by the customer or is a readable tag code (not internal DB key)
+  const isInternalSubCode = record.appraisalCode?.startsWith('APPR-SUB-');
+  const codeInfo = meta.codeInfo || (isInternalSubCode ? undefined : record.appraisalCode) || undefined;
+
   return {
     id: record.id,
+    referenceId: `#${record.id}`,
     customerName: record.customerName,
     customerEmail: record.customerEmail,
     customerPhone: record.customerPhone || undefined,
     orderNumber: meta.orderNumber || undefined,
     productName: meta.productName || meta.sourceProduct || 'Surprise Reveal Candle',
     jewelryType: record.jewelryType || 'Ring',
-    metalType: record.metalType || undefined,
-    gemstoneType: record.gemstoneType || undefined,
-    codeInfo: meta.codeInfo || record.appraisalCode,
-    photoPreviews: record.images || [],
-    images: record.images || [],
+    metalType: record.metalType || meta.metalType || undefined,
+    gemstoneType: record.gemstoneType || meta.gemstoneType || undefined,
+    codeInfo,
+    photoPreviews: images,
+    images,
+    photos: images,
     status,
-    notes: notesText || record.description || undefined,
-    appraiserNotes: notesText || undefined,
+    notes: customerNotes,
+    customerNotes,
+    appraiserNotes,
     estimatedValue: record.estimatedValue ? Number(record.estimatedValue) : undefined,
     appraisedValue: record.appraisedValue ? Number(record.appraisedValue) : undefined,
+    submittedAt: record.createdAt.toISOString(),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
@@ -288,6 +301,7 @@ export async function listAdminAppraisals(query: {
 }): Promise<{
   appraisals: JewelryAppraisal[];
   submissions: CustomerAppraisalSubmission[];
+  items: any[];
   stats: AppraisalStatsResponse;
   pagination: { total: number; page: number; limit: number; totalPages: number };
 }> {
@@ -342,18 +356,24 @@ export async function listAdminAppraisals(query: {
   };
 
   // Filter based on active section/tab
-  const activeTab = query.tab || query.section || 'certificates';
+  const activeTab = (query.tab || query.section || 'certificates').toLowerCase();
   let targetList: any[] = activeTab === 'submissions' ? submissionRecords : certificateRecords;
 
   if (query.search) {
     const s = query.search.toLowerCase().trim();
+    const cleanS = s.replace(/^#/, '');
     if (activeTab === 'submissions') {
       targetList = targetList.filter(
         (item: CustomerAppraisalSubmission) =>
+          item.id.toLowerCase().includes(s) ||
+          item.id.toLowerCase().includes(cleanS) ||
+          (item.referenceId && item.referenceId.toLowerCase().includes(s)) ||
           item.customerName.toLowerCase().includes(s) ||
           item.customerEmail.toLowerCase().includes(s) ||
+          (item.customerPhone && item.customerPhone.toLowerCase().includes(s)) ||
           (item.productName && item.productName.toLowerCase().includes(s)) ||
-          (item.orderNumber && item.orderNumber.toLowerCase().includes(s)) ||
+          (item.jewelryType && item.jewelryType.toLowerCase().includes(s)) ||
+          (item.orderNumber && item.orderNumber.toLowerCase().includes(cleanS)) ||
           (item.codeInfo && item.codeInfo.toLowerCase().includes(s))
       );
     } else {
@@ -363,7 +383,7 @@ export async function listAdminAppraisals(query: {
           item.name.toLowerCase().includes(s) ||
           item.material.toLowerCase().includes(s) ||
           (item.stone && item.stone.toLowerCase().includes(s)) ||
-          (item.orderNumber && item.orderNumber.toLowerCase().includes(s)) ||
+          (item.orderNumber && item.orderNumber.toLowerCase().includes(cleanS)) ||
           (item.customerName && item.customerName.toLowerCase().includes(s))
       );
     }
@@ -389,6 +409,7 @@ export async function listAdminAppraisals(query: {
   return {
     appraisals: activeTab === 'submissions' ? certificateRecords : paginated,
     submissions: activeTab === 'submissions' ? paginated : submissionRecords,
+    items: paginated,
     stats,
     pagination: {
       total,
@@ -482,10 +503,17 @@ export async function createAppraisal(data: CreateAppraisalDTO): Promise<Jewelry
  * Get appraisal by ID or Code
  */
 export async function getAppraisalByIdOrCode(idOrCode: string): Promise<JewelryAppraisal> {
-  const norm = normalizeCode(idOrCode);
+  const cleanId = (idOrCode || '').trim().replace(/^#/, '');
+  const norm = normalizeCode(cleanId);
   const record = await prisma.appraisal_records.findFirst({
     where: {
-      OR: [{ id: idOrCode }, { appraisalCode: norm }, { certificateNumber: idOrCode }],
+      OR: [
+        { id: cleanId },
+        { id: idOrCode },
+        { appraisalCode: norm },
+        { certificateNumber: cleanId },
+        { certificateNumber: idOrCode },
+      ],
     },
   });
 
@@ -496,6 +524,73 @@ export async function getAppraisalByIdOrCode(idOrCode: string): Promise<JewelryA
   }
 
   return formatJewelryAppraisal(record);
+}
+
+/**
+ * Get single customer submission by ID or Reference ID
+ */
+export async function getSubmissionById(idOrRef: string): Promise<CustomerAppraisalSubmission> {
+  const cleanId = (idOrRef || '').trim().replace(/^#/, '');
+  const norm = normalizeCode(cleanId);
+
+  const record = await prisma.appraisal_records.findFirst({
+    where: {
+      OR: [
+        { id: cleanId },
+        { id: idOrRef },
+        { appraisalCode: norm },
+        { certificateNumber: cleanId },
+      ],
+    },
+  });
+
+  if (!record) {
+    const err: any = new Error(`Customer submission "${idOrRef}" not found`);
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return formatCustomerSubmission(record);
+}
+
+/**
+ * Get record as either Appraisal or Submission depending on its type
+ */
+export async function getAppraisalOrSubmissionById(idOrCode: string): Promise<{
+  appraisal: JewelryAppraisal;
+  submission?: CustomerAppraisalSubmission;
+  isSubmission: boolean;
+}> {
+  const cleanId = (idOrCode || '').trim().replace(/^#/, '');
+  const norm = normalizeCode(cleanId);
+  const record = await prisma.appraisal_records.findFirst({
+    where: {
+      OR: [
+        { id: cleanId },
+        { id: idOrCode },
+        { appraisalCode: norm },
+        { certificateNumber: cleanId },
+        { certificateNumber: idOrCode },
+      ],
+    },
+  });
+
+  if (!record) {
+    const err: any = new Error(`Record with identifier "${idOrCode}" not found`);
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const { meta } = parseNotesMeta(record.appraiserNotes);
+  const isSubmission =
+    meta.isSubmission === true ||
+    ['SUBMITTED', 'PENDING', 'REVIEWED', 'APPROVED', 'REJECTED'].includes(record.status.toUpperCase());
+
+  return {
+    appraisal: formatJewelryAppraisal(record),
+    submission: isSubmission ? formatCustomerSubmission(record) : undefined,
+    isSubmission,
+  };
 }
 
 /**
@@ -616,36 +711,67 @@ export async function resetAppraisalsToDefaults(): Promise<void> {
  * Customer / Storefront: Submit jewelry item for appraisal
  */
 export async function submitCustomerAppraisal(data: SubmitCustomerAppraisalDTO): Promise<CustomerAppraisalSubmission> {
-  const subId = `appr-sub-${Date.now()}-${crypto.randomUUID().substring(0, 6)}`;
-  const code = normalizeCode(data.codeInfo || `SUB-${Date.now()}`);
+  const randomSuffix = Math.random().toString(36).substring(2, 7);
+  const subId = `appr-sub-${Date.now()}-${randomSuffix}`;
+  
+  // Use unique generated database code to prevent any collision with certificate codes or duplicate tag codes
+  const uniqueDbCode = subId.toUpperCase();
+
+  const customerName = (data.customerName || data.name || data.fullName || 'Anonymous Customer').trim();
+  const customerEmail = (data.customerEmail || data.email || '').trim().toLowerCase();
+  const productName = (data.productName || data.product || data.sourceProduct || 'Surprise Reveal Candle').trim();
+  const jewelryType = (data.jewelryType || data.type || 'Ring').trim();
+  const orderNumber = (data.orderNumber || data.orderId || '').trim() || undefined;
+  const rawCodeInfo = (data.codeInfo || data.appraisalCode || data.code || data.tagCode || '').trim() || undefined;
+  const notes = (data.notes || data.description || '').trim();
+
+  // Combine image sources and convert base64 data URLs if present
+  let rawImages = data.images || data.photoPreviews || data.photos || [];
+  if (!Array.isArray(rawImages)) rawImages = [rawImages];
+
+  const images: string[] = [];
+  for (const img of rawImages) {
+    if (typeof img === 'string' && img.trim().length > 0) {
+      if (img.startsWith('data:image/')) {
+        try {
+          const savedPath = await saveBase64Image(img);
+          images.push(savedPath);
+        } catch {
+          images.push(img);
+        }
+      } else {
+        images.push(img.trim());
+      }
+    }
+  }
 
   const meta = {
-    name: `${data.jewelryType} Reveal Submission`,
-    productName: data.productName,
-    orderNumber: data.orderNumber,
-    codeInfo: data.codeInfo,
+    name: `${jewelryType} Reveal Submission`,
+    productName,
+    orderNumber,
+    codeInfo: rawCodeInfo,
+    customerNotes: notes,
+    appraiserNotes: '',
     isSubmission: true,
-    notes: data.notes || '',
+    notes,
   };
-
-  const images = data.photoPreviews || data.images || [];
 
   const record = await prisma.appraisal_records.create({
     data: {
       id: subId,
-      appraisalCode: code,
-      customerName: data.customerName,
-      customerEmail: data.customerEmail,
-      customerPhone: data.customerPhone || null,
-      jewelryType: data.jewelryType,
-      metalType: data.metalType || null,
-      gemstoneType: data.gemstoneType || null,
-      description: data.notes || `Submission from order ${data.orderNumber || 'N/A'}`,
+      appraisalCode: uniqueDbCode,
+      customerName,
+      customerEmail,
+      customerPhone: data.customerPhone || data.phone || null,
+      jewelryType,
+      metalType: data.metalType || data.material || null,
+      gemstoneType: data.gemstoneType || data.stone || null,
+      description: notes || (orderNumber ? `Submission from order ${orderNumber}` : 'Customer appraisal submission'),
       images,
-      estimatedValue: data.estimatedValue ?? 0,
-      appraisedValue: data.estimatedValue ?? 0,
+      estimatedValue: data.estimatedValue ? Number(data.estimatedValue) : 0,
+      appraisedValue: data.estimatedValue ? Number(data.estimatedValue) : 0,
       appraiserNotes: JSON.stringify(meta),
-      certificateNumber: `SUB-CERT-${Date.now()}`,
+      certificateNumber: `SUB-CERT-${Date.now()}-${randomSuffix}`,
       status: 'PENDING',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -659,8 +785,11 @@ export async function submitCustomerAppraisal(data: SubmitCustomerAppraisalDTO):
  * Admin: Update customer appraisal submission (valuation, gemologist review, status)
  */
 export async function updateCustomerSubmission(id: string, data: UpdateCustomerSubmissionDTO): Promise<CustomerAppraisalSubmission> {
-  const existing = await prisma.appraisal_records.findUnique({
-    where: { id },
+  const cleanId = (id || '').trim().replace(/^#/, '');
+  const existing = await prisma.appraisal_records.findFirst({
+    where: {
+      OR: [{ id: cleanId }, { id }, { appraisalCode: normalizeCode(cleanId) }],
+    },
   });
   if (!existing) {
     const err: any = new Error('Customer submission not found');
@@ -669,15 +798,20 @@ export async function updateCustomerSubmission(id: string, data: UpdateCustomerS
   }
 
   const { meta: oldMeta } = parseNotesMeta(existing.appraiserNotes);
+  const appraiserNotes = data.appraiserNotes !== undefined ? data.appraiserNotes : oldMeta.appraiserNotes;
+  const customerNotes = data.customerNotes !== undefined ? data.customerNotes : (oldMeta.customerNotes || oldMeta.notes || '');
+
   const newMeta = {
     ...oldMeta,
-    notes: data.notes !== undefined ? data.notes : data.appraiserNotes !== undefined ? data.appraiserNotes : oldMeta.notes,
+    appraiserNotes: appraiserNotes || '',
+    customerNotes: customerNotes || '',
+    notes: data.notes !== undefined ? data.notes : (appraiserNotes || customerNotes),
   };
 
   const status = data.status ? data.status.toUpperCase() : undefined;
 
   const updated = await prisma.appraisal_records.update({
-    where: { id },
+    where: { id: existing.id },
     data: {
       ...(status && { status }),
       ...(data.estimatedValue !== undefined && { estimatedValue: data.estimatedValue }),
@@ -691,12 +825,12 @@ export async function updateCustomerSubmission(id: string, data: UpdateCustomerS
 }
 
 /**
- * Public Customer Lookup: Check appraisal certificate code
+ * Public Customer Lookup: Check appraisal certificate code or submission reference ID
  */
 export async function lookupAppraisalCode(rawCode: string): Promise<AppraisalLookupResponse> {
   await seedDefaultAppraisalsIfEmpty();
 
-  const cleanCode = normalizeCode(rawCode);
+  const cleanCode = normalizeCode(rawCode).replace(/^#/, '');
   if (!cleanCode) {
     return {
       success: false,
@@ -704,7 +838,8 @@ export async function lookupAppraisalCode(rawCode: string): Promise<AppraisalLoo
     };
   }
 
-  const matched = await prisma.appraisal_records.findFirst({
+  // 1. First look for active pre-minted certificate
+  const matchedCert = await prisma.appraisal_records.findFirst({
     where: {
       OR: [
         { appraisalCode: cleanCode },
@@ -714,35 +849,72 @@ export async function lookupAppraisalCode(rawCode: string): Promise<AppraisalLoo
     },
   });
 
-  if (!matched) {
+  if (matchedCert) {
+    const item = formatJewelryAppraisal(matchedCert);
     return {
-      success: false,
-      error: "We couldn't find that jewelry code. Please check the code and try again.",
+      success: true,
+      data: {
+        code: item.code,
+        name: item.name,
+        type: item.type,
+        estimatedValue: item.estimatedValue,
+        retailValue: item.retailValue,
+        image: item.image,
+        images: item.images,
+        material: item.material,
+        stone: item.stone,
+        cutSetting: item.cutSetting,
+        specsAndMaterials: item.specsAndMaterials,
+        description: item.description,
+        serialNumber: item.serialNumber,
+        certificateNumber: item.certificateNumber,
+        inspectedDate: item.inspectedDate,
+      },
     };
   }
 
-  const item = formatJewelryAppraisal(matched);
+  // 2. Check if this is a submission reference ID (e.g. #appr-sub-... or appr-sub-...)
+  const matchedSub = await prisma.appraisal_records.findFirst({
+    where: {
+      OR: [
+        { id: cleanCode.toLowerCase() },
+        { appraisalCode: cleanCode },
+        { certificateNumber: cleanCode },
+      ],
+    },
+  });
 
-  const publicResult: PublicAppraisalResult = {
-    code: item.code,
-    name: item.name,
-    type: item.type,
-    estimatedValue: item.estimatedValue,
-    retailValue: item.retailValue,
-    image: item.image,
-    images: item.images,
-    material: item.material,
-    stone: item.stone,
-    cutSetting: item.cutSetting,
-    specsAndMaterials: item.specsAndMaterials,
-    description: item.description,
-    serialNumber: item.serialNumber,
-    certificateNumber: item.certificateNumber,
-    inspectedDate: item.inspectedDate,
-  };
+  if (matchedSub) {
+    const sub = formatCustomerSubmission(matchedSub);
+    const subStatus = sub.status.toUpperCase();
+    const isApproved = subStatus === 'APPROVED';
+
+    return {
+      success: true,
+      data: {
+        code: `#${sub.id}`,
+        name: `${sub.jewelryType} Submission (${sub.productName})`,
+        type: (sub.jewelryType || 'Ring') as JewelryType,
+        estimatedValue: sub.estimatedValue || 0,
+        retailValue: sub.appraisedValue || sub.estimatedValue || 0,
+        image: sub.images && sub.images.length > 0 ? sub.images[0] : '',
+        images: sub.images || [],
+        material: sub.metalType || 'Fine Jewelry',
+        stone: sub.gemstoneType || 'Gemstone',
+        cutSetting: isApproved ? 'Gemologist Verified' : 'In Gemologist Review',
+        specsAndMaterials: `Status: ${sub.status.toUpperCase()} • Submitted: ${sub.submittedAt ? sub.submittedAt.split('T')[0] : 'Recently'}`,
+        description: isApproved
+          ? (sub.appraiserNotes || 'Official valuation issued by certified gemology team.')
+          : 'Your jewelry appraisal submission is currently under review by our certified appraisal specialists.',
+        serialNumber: sub.id,
+        certificateNumber: `#${sub.id}`,
+        inspectedDate: sub.submittedAt ? sub.submittedAt.split('T')[0] : new Date().toISOString().split('T')[0],
+      },
+    };
+  }
 
   return {
-    success: true,
-    data: publicResult,
+    success: false,
+    error: "We couldn't find that jewelry code. Please check the code and try again.",
   };
 }
