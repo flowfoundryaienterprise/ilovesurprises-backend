@@ -57,6 +57,21 @@ import {
 import { analyticsController } from '../controllers/analytics.controller';
 import { settingsController } from '../controllers/settings.controller';
 import { updateSettingsSchema } from '../validation/settings.validation';
+import { membershipController } from '../controllers/membership.controller';
+import { appraisalController } from '../controllers/appraisal.controller';
+import {
+  listMembershipsQuerySchema,
+  updateMembershipStatusSchema,
+  updateMembershipPricingSchema,
+  createMembershipPlanSchema,
+  updateMembershipPlanSchema,
+} from '../validation/membership.validation';
+import {
+  listAppraisalsQuerySchema,
+  createAppraisalSchema,
+  updateAppraisalSchema,
+  updateCustomerSubmissionSchema,
+} from '../validation/appraisal.validation';
 import { UserRole } from '@prisma/client';
 
 export const adminRouter = Router();
@@ -963,6 +978,180 @@ adminRouter.post('/system-settings/reset', (req, res, next) => {
 adminRouter.get('/settings/starter-kits', (req, res, next) => {
   settingsController.getStarterKits(req, res, next);
 });
+
+// ─── VIP MEMBERSHIPS (ADMIN) ──────────────────────────────────────────────────
+
+/**
+ * @openapi
+ * /api/admin/memberships:
+ *   get:
+ *     summary: List representative memberships
+ *     description: Retrieve representative subscriptions with filtering by rep name, plan, and status.
+ *     tags:
+ *       - Admin Memberships
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by rep name, email, or @username
+ *       - in: query
+ *         name: plan
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of memberships, plans, and metrics.
+ */
+adminRouter.get('/memberships', validateRequest(listMembershipsQuerySchema), (req, res, next) => {
+  membershipController.listAdminMemberships(req, res, next);
+});
+
+adminRouter.get('/memberships/plans', (req, res, next) => {
+  membershipController.listMembershipPlans(req, res, next);
+});
+
+adminRouter.post('/memberships/plans', validateRequest(createMembershipPlanSchema), (req, res, next) => {
+  membershipController.createMembershipPlan(req, res, next);
+});
+
+adminRouter.patch('/memberships/plans/:id', validateRequest(updateMembershipPlanSchema), (req, res, next) => {
+  membershipController.updateMembershipPlan(req, res, next);
+});
+
+adminRouter.get('/memberships/pricing', (req, res, next) => {
+  membershipController.getMembershipPricing(req, res, next);
+});
+
+adminRouter.put('/memberships/pricing', validateRequest(updateMembershipPricingSchema), (req, res, next) => {
+  membershipController.updateMembershipPricing(req, res, next);
+});
+
+adminRouter.post('/memberships', (req, res, next) => {
+  membershipController.assignMembership(req, res, next);
+});
+
+adminRouter.patch('/memberships/:id/status', validateRequest(updateMembershipStatusSchema), (req, res, next) => {
+  membershipController.updateMembershipStatus(req, res, next);
+});
+
+adminRouter.patch('/memberships/:id', (req, res, next) => {
+  membershipController.updateMembershipStatus(req, res, next);
+});
+
+adminRouter.delete('/memberships/:id', (req, res, next) => {
+  membershipController.deleteMembership(req, res, next);
+});
+
+// ─── JEWELRY APPRAISALS (ADMIN) ───────────────────────────────────────────────
+
+/**
+ * @openapi
+ * /api/admin/appraisals:
+ *   get:
+ *     summary: List jewelry appraisal codes and submissions
+ *     description: Retrieve registered appraisal codes and customer submissions with KPI stats.
+ *     tags:
+ *       - Admin Appraisals
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: tab
+ *         schema:
+ *           type: string
+ *           enum: [certificates, submissions, all]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Appraisal records, submissions, and statistics.
+ */
+adminRouter.get('/appraisals', validateRequest(listAppraisalsQuerySchema), (req, res, next) => {
+  appraisalController.listAdminAppraisals(req, res, next);
+});
+
+adminRouter.get('/appraisals/stats', (req, res, next) => {
+  appraisalController.getAppraisalStats(req, res, next);
+});
+
+adminRouter.post('/appraisals', validateRequest(createAppraisalSchema), (req, res, next) => {
+  appraisalController.createAppraisal(req, res, next);
+});
+
+adminRouter.post('/appraisals/clear', (req, res, next) => {
+  appraisalController.clearAppraisals(req, res, next);
+});
+
+adminRouter.delete('/appraisals', (req, res, next) => {
+  appraisalController.clearAppraisals(req, res, next);
+});
+
+adminRouter.post('/appraisals/reset', (req, res, next) => {
+  appraisalController.resetAppraisals(req, res, next);
+});
+
+// Customer submissions management
+adminRouter.get('/appraisals/submissions', (req, res, next) => {
+  req.query.tab = 'submissions';
+  appraisalController.listAdminAppraisals(req, res, next);
+});
+
+adminRouter.get('/appraisals/submissions/:id', (req, res, next) => {
+  appraisalController.getAppraisalById(req, res, next);
+});
+
+adminRouter.patch('/appraisals/submissions/:id', validateRequest(updateCustomerSubmissionSchema), (req, res, next) => {
+  appraisalController.updateCustomerSubmission(req, res, next);
+});
+
+adminRouter.delete('/appraisals/submissions/:id', (req, res, next) => {
+  appraisalController.deleteCustomerSubmission(req, res, next);
+});
+
+// Single appraisal item endpoints
+adminRouter.get('/appraisals/:id', (req, res, next) => {
+  appraisalController.getAppraisalById(req, res, next);
+});
+
+adminRouter.patch('/appraisals/:id', validateRequest(updateAppraisalSchema), (req, res, next) => {
+  appraisalController.updateAppraisal(req, res, next);
+});
+
+adminRouter.put('/appraisals/:id', validateRequest(updateAppraisalSchema), (req, res, next) => {
+  appraisalController.updateAppraisal(req, res, next);
+});
+
+adminRouter.delete('/appraisals/:id', (req, res, next) => {
+  appraisalController.deleteAppraisal(req, res, next);
+});
+
 
 
 

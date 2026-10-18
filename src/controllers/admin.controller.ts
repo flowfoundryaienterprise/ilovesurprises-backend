@@ -150,6 +150,8 @@ export const deleteProduct = async (
 };
 
 import * as orderController from './order.controller';
+import { membershipController } from './membership.controller';
+import { appraisalController } from './appraisal.controller';
 
 // Backward compatibility object export
 export const adminController = {
@@ -184,5 +186,27 @@ export const adminController = {
   createOrUpdateFulfillment: orderController.createOrUpdateFulfillment,
   addOrderNote: orderController.addOrderNote,
   processOrderRefund: orderController.processOrderRefund,
+  // Memberships
+  listMemberships: membershipController.listAdminMemberships,
+  updateMembershipStatus: membershipController.updateMembershipStatus,
+  getMembershipPricing: membershipController.getMembershipPricing,
+  updateMembershipPricing: membershipController.updateMembershipPricing,
+  listMembershipPlans: membershipController.listMembershipPlans,
+  createMembershipPlan: membershipController.createMembershipPlan,
+  updateMembershipPlan: membershipController.updateMembershipPlan,
+  assignMembership: membershipController.assignMembership,
+  deleteMembership: membershipController.deleteMembership,
+  // Appraisals
+  listAppraisals: appraisalController.listAdminAppraisals,
+  getAppraisalStats: appraisalController.getAppraisalStats,
+  createAppraisal: appraisalController.createAppraisal,
+  getAppraisalById: appraisalController.getAppraisalById,
+  updateAppraisal: appraisalController.updateAppraisal,
+  deleteAppraisal: appraisalController.deleteAppraisal,
+  clearAppraisals: appraisalController.clearAppraisals,
+  resetAppraisals: appraisalController.resetAppraisals,
+  updateCustomerSubmission: appraisalController.updateCustomerSubmission,
+  deleteCustomerSubmission: appraisalController.deleteCustomerSubmission,
 };
+
 

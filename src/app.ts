@@ -63,6 +63,8 @@ export const createApp = (): Application => {
           payments: '/api/payments',
           orders: '/api/orders',
           settings: '/api/admin/settings',
+          memberships: '/api/memberships',
+          appraisals: '/api/appraisals',
         },
       },
     });
